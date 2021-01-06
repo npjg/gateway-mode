@@ -102,12 +102,16 @@ return an alist of the version abbreviation and full name."
 	(use-local-map gateway-display-mode-map)
 	(run-hooks 'gateway-display-mode-hook)
 	:group gateway)
+(defun gateway--update-message (entity status)
+	"Display a message when a visibility ENTITY is set to STATUS."
+	(message (format "%s %sabled in current buffer" entity (if status "dis" "en"))))
 
 (defun gateway-toggle-crossrefs ()
 	"Toggle the display of footnotes in the current BibleGateway buffer."
 	(interactive)
 	(gateway--assert-mode)
 	(setq-local gateway-inhibit-crossrefs (not gateway-inhibit-crossrefs))
+	(gateway--update-message "Cross-references"  gateway-inhibit-crossrefs)
 	(message (format "Cross-references %sabled in current buffer" (if gateway-inhibit-crossrefs "dis" "en")))
 	(gateway-refresh-passage))
 
@@ -116,7 +120,7 @@ return an alist of the version abbreviation and full name."
 	(interactive)
 	(gateway--assert-mode)
 	(setq-local gateway-inhibit-footnotes (not gateway-inhibit-footnotes))
-	(message (format "Footnotes %sabled in current buffer" (if gateway-inhibit-footnotes "dis" "en")))
+	(gateway--update-message "Footnotes" gateway-inhibit-footnotes)
 	(gateway-refresh-passage))
 
 (defun gateway-toggle-headings ()
@@ -124,7 +128,7 @@ return an alist of the version abbreviation and full name."
 	(interactive)
 	(gateway--assert-mode)
 	(setq-local gateway-inhibit-headings (not gateway-inhibit-headings))
-	(message (format "Headings %sabled in current buffer" (if gateway-inhibit-headings "dis" "en")))
+	(gateway--update-message "Headings" gateway-inhibit-headings)
 	(gateway-refresh-passage))
 
 (defun gateway-toggle-versenums ()
@@ -132,7 +136,7 @@ return an alist of the version abbreviation and full name."
 	(interactive)
 	(gateway--assert-mode)
 	(setq-local gateway-inhibit-versenums (not gateway-inhibit-versenums))
-	(message (format "Verse numbers %sabled in current buffer" (if gateway-inhibit-versenums "dis" "en")))
+	(gateway--update-message "Verse numbers" gateway-inhibit-versenums)
 	(gateway-refresh-passage))
 
 (defun gateway-refresh-passage ()
