@@ -35,8 +35,34 @@
 (defun gateway-set-version ()
 	"Set `gateway-version' with the valid options provided by BibleGateway."
 	(interactive)
-	(let ((versions (gateway--get-versions)))
-		(setq gateway-version (cdr (assoc (completing-read "Version: " versions nil t) versions)))))
+	(let* ((versions (gateway--get-versions))
+				(version (completing-read "Version: " versions nil t)))
+		(setq gateway-version (cdr (assoc version versions)))
+		(message (format "Set BibleGateway version to %s" version))))
+
+(defun gateway-get-passage (passage)
+	"Get the passage DOM from BibleGateway."
+	(interactive "MReference: ") ; (format "MReference (%s): " gateway-version))
+	(gateway--check-libxml)
+	(unless gateway-version
+		(gateway-set-version))
+	(let ((passage-url (format "https://www.biblegateway.com/passage/?search=%s&version=%s&interface=print" passage gateway-version)))
+		(with-current-buffer (url-retrieve-synchronously passage-url gateway-inhibit-cookies)
+			(let* ((dom (libxml-parse-html-region (point) (point-max)))
+						 (bcv (car (dom-strings (car (dom-by-class dom "^bcv$")))))
+						 (translation (car (dom-strings (car (dom-by-class dom "^translation$")))))
+						 (copyright (dom-by-class dom "^copyright-table$"))
+						 (text (dom-by-class dom "^passage-text$"))
+						 (passage-name (format "*BibleGateway: %s (%s)*" bcv gateway-version)))
+				(unless bcv
+					(user-error (format "Could not find passage \"%s\" in version %s" passage gateway-version)))
+
+				(with-output-to-temp-buffer passage-name
+					(pop-to-buffer passage-name)
+					(shr-insert-document text)
+					(shr-insert-document '(html nil (body nil (hr nil))))
+					(shr-insert-document copyright))
+			))))
 
 (provide 'gateway-mode)
 ;;; gateway-mode.el ends here
