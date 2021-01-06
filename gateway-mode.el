@@ -47,7 +47,7 @@ return an alist of the version abbreviation and full name."
 		(message (format "Set BibleGateway version to %s" version))))
 
 (defun gateway-get-passage (passage)
-	"Get the passage DOM from BibleGateway."
+	"Load a PASSAGE from BibleGateway."
 	(interactive "MReference: ") ; (format "MReference (%s): " gateway-version))
 	(gateway--check-libxml)
 	(unless gateway-version
@@ -62,9 +62,9 @@ return an alist of the version abbreviation and full name."
 						 (passage-name (format "*BibleGateway: %s (%s)*" bcv gateway-version)))
 				(unless bcv
 					(user-error (format "Could not find passage \"%s\" in version %s" passage gateway-version)))
-
 				(with-output-to-temp-buffer passage-name
 					(pop-to-buffer passage-name)
+					(setq header-line-format (format " %s (%s)" bcv translation))
 					(shr-insert-document text)
 					(shr-insert-document '(html nil (body nil (hr nil))))
 					(shr-insert-document copyright))
