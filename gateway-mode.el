@@ -15,7 +15,7 @@
 
 (defvar gateway-version nil
 	"The Bible version to use for interacting with Bible Gateway.
-	To modify with available versions, use `gateway-set-version'")
+To modify with available versions, use `gateway-set-version'.")
 
 (defvar gateway-inhibit-cookies t
 	"Whether or not to inhibit cookies in BibleGateway URL requests.")
@@ -27,7 +27,7 @@
 
 (defun gateway--get-versions ()
 	"Get the static version information from BibleGateway, and
-	return an alist of the version abbreviation and full name."
+return an alist of the version abbreviation and full name."
 	(gateway--check-libxml)
 	(message "Retrieving version list from remote...")
 	(with-current-buffer (url-retrieve-synchronously "https://biblegateway.com" t gateway-inhibit-cookies)
