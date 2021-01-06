@@ -99,6 +99,7 @@ return an alist of the version abbreviation and full name."
 	(define-key gateway-display-mode-map "F" #'gateway-toggle-footnotes)
 	(define-key gateway-display-mode-map "H" #'gateway-toggle-headings)
 	(define-key gateway-display-mode-map "V" #'gateway-toggle-versenums)
+	(define-key gateway-display-mode-map "P" #'gateway-display-verse-point)
 	(use-local-map gateway-display-mode-map)
 	(run-hooks 'gateway-display-mode-hook)
 	:group gateway)
@@ -160,11 +161,37 @@ return an alist of the version abbreviation and full name."
 			(when gateway-inhibit-versenums
 				(dolist (node (dom-by-class text (regexp-opt '("chapternum" "versenum"))))
 					(dom-remove-node text node)))
-			(shr-insert-document text))
+			(advice-add #'shr-tag-span :around #'gateway--shr-tag-span)
+			(shr-insert-document text)
+			(advice-remove #'shr-tag-span #'gateway--shr-tag-span))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
 		(goto-char pos))
 	(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation))))
+
+(defun gateway--shr-tag-span (func &rest r)
+	"Set the verse property for each span. Only intended to advise
+`shr-tag-span'."
+	(let* ((dom (car r))
+				 (init (point))
+				 (classes (split-string (cdr (assoc 'class (cadr dom))))))
+		(apply func r)
+		(when (string= (car classes) "text")
+			(put-text-property init (point) 'verse (cadr classes)))))
+
+(defun gateway--verse-point ()
+	"Return the reference of the current verse."
+	(gateway--assert-mode)
+	(let ((loc (get-text-property (point) 'verse)))
+		(unless loc
+			(user-error "No verse defined at point"))
+		(let* ((components (split-string loc "-")))
+			(apply #'format (push "%s %s:%s" components)))))
+
+(defun gateway-display-verse-point ()
+	"Display the reference of the current verse."
+	(interactive)
+	(message (gateway--verse-point)))
 
 (provide 'gateway-mode)
 ;;; gateway-mode.el ends here
