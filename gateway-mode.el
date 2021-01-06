@@ -20,9 +20,15 @@
 (defvar gateway-inhibit-cookies t
 	"Whether or not to inhibit cookies in BibleGateway URL requests.")
 
+(defun gateway--check-libxml ()
+	"Assert that libxml2 is compiled into Emacs."
+	(unless (fboundp 'libxml-parse-html-region)
+    (error "This function requires Emacs to be compiled with libxml2")))
+
 (defun gateway--get-versions ()
 	"Get the static version information from BibleGateway, and
 	return an alist of the version abbreviation and full name."
+	(gateway--check-libxml)
 	(message "Retrieving version list from remote...")
 	(with-current-buffer (url-retrieve-synchronously "https://biblegateway.com" t gateway-inhibit-cookies)
 		(let* ((dom (libxml-parse-html-region (point) (point-max)))
