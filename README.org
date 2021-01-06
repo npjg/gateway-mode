@@ -1,0 +1,4 @@
+#+TITLE: gateway-mode
+
+This package provides an Emacs interface to BibleGateway. Currently only
+searching for Scripture passages is supported.
