@@ -42,43 +42,56 @@ To modify with available versions, use `gateway-set-version'.")
 	(unless (fboundp 'libxml-parse-html-region)
     (error "This function requires Emacs to be compiled with libxml2")))
 
-(defun gateway--get-versions ()
+(defun gateway--version-completing-read ()
 	"Get the static version information from BibleGateway, and
-return an alist of the version abbreviation and full name."
+perform a `completing-read' which returns an alist of the
+version's abbreviation and full name."
 	(gateway--check-libxml)
-	(message "Retrieving version list from remote...")
 	(with-current-buffer (url-retrieve-synchronously "https://biblegateway.com" t gateway-inhibit-cookies)
 		(let* ((dom (libxml-parse-html-region (point) (point-max)))
 					 (options (cddar (dom-by-tag dom 'select)))
 					 (results nil))
 			(dolist (option (reverse options) results)
 				(unless (assoc 'class (cadr option))
-					(push (cons (caddr option) (cdr (assoc 'value (cadr option)))) results))))))
+					(push (cons (caddr option) (cdr (assoc 'value (cadr option)))) results)))
+			(assoc (completing-read "Version: " results nil t) results))))
 
 (defun gateway-set-version ()
-	"Set `gateway-version' with the valid options provided by BibleGateway."
+	"Set the global `gateway-version' with the valid options
+provided by BibleGateway."
 	(interactive)
-	(let* ((versions (gateway--get-versions))
-				(version (completing-read "Version: " versions nil t)))
-		(setq gateway-version (cdr (assoc version versions)))
-		(message (format "Set BibleGateway version to %s" version))))
+	(let ((version (cdr (gateway--version-completing-read))))
+		(setq gateway-version version)
+		(message (format "Set global BibleGateway version to %s" version))))
 
-(defun gateway-get-passage (passage)
-	"Load a PASSAGE from BibleGateway."
+(defun gateway-change-version ()
+	"Change the version for the current passage only."
+	(interactive)
+	(gateway--assert-mode)
+	(let ((bcv (plist-get gateway-data :bcv))
+				(version (cdr (gateway--version-completing-read))))
+		(kill-buffer)
+		(gateway-get-passage bcv version)
+		(message "Changed local BibleGateway version to %s" version)))
+
+(defun gateway-get-passage (passage &optional version)
+	"Load a PASSAGE from BibleGateway. The global version specified
+in `gateway-version' is used, unless VERSION is provided."
 	(interactive "MReference: ") ; (format "MReference (%s): " gateway-version))
 	(gateway--check-libxml)
 	(unless gateway-version
 		(gateway-set-version))
-	(let ((passage-url (format "https://www.biblegateway.com/passage/?search=%s&version=%s&interface=print" passage gateway-version)))
+	(let* ((version (or version gateway-version))
+				 (passage-url (format "https://www.biblegateway.com/passage/?search=%s&version=%s&interface=print" passage version)))
 		(with-current-buffer (url-retrieve-synchronously passage-url gateway-inhibit-cookies)
 			(let* ((dom (libxml-parse-html-region (point) (point-max)))
 						 (bcv (car (dom-strings (car (dom-by-class dom "^bcv$")))))
 						 (translation (car (dom-strings (car (dom-by-class dom "^translation$")))))
 						 (copyright (dom-by-class dom "^copyright-table$"))
 						 (text (dom-by-class dom "^passage-text$"))
-						 (passage-name (format "*BibleGateway: %s (%s)*" bcv gateway-version)))
+						 (passage-name (format "*BibleGateway: %s (%s)*" bcv version)))
 				(unless bcv
-					(user-error (format "Could not find passage \"%s\" in version %s" passage gateway-version)))
+					(user-error (format "Could not find passage \"%s\" in version %s" passage version)))
 				(with-output-to-temp-buffer passage-name
 					(setq inhibit-read-only t)
 					(pop-to-buffer passage-name)
