@@ -1,5 +1,7 @@
 ;;; gateway-mode --- access Bible Gateway from Emacs
 
+;;; Commentary:
+
 ;; Licensed under the same terms as Emacs and under the MIT license.
 
 ;; Author: Nathanael Gentry <nathanael.gentrydb8@gmail.com>
@@ -102,7 +104,7 @@ in `gateway-version' is used, unless VERSION is provided."
 (defun gateway--assert-mode ()
 	"Raise an error if the proper data structures are not resent."
 	(unless (boundp 'gateway-data)
-		(user-error "Buffer not in gateway-view-mode")))
+		(user-error "Not a BibleGateway buffer")))
 
 (define-derived-mode gateway-display-mode help-mode "Gateway"
 	"Major mode for displaying Gateway passages."
@@ -115,7 +117,9 @@ in `gateway-version' is used, unless VERSION is provided."
 	(define-key gateway-display-mode-map "P" #'gateway-display-verse-point)
 	(use-local-map gateway-display-mode-map)
 	(run-hooks 'gateway-display-mode-hook)
-	:group gateway)
+	;; :group gateway
+	)
+
 (defun gateway--update-message (entity status)
 	"Display a message when a visibility ENTITY is set to STATUS."
 	(message (format "%s %sabled in current buffer" entity (if status "dis" "en"))))
@@ -154,11 +158,11 @@ in `gateway-version' is used, unless VERSION is provided."
 	(gateway-refresh-passage))
 
 (defun gateway-refresh-passage ()
-	"Refresh the currently-displayed passage."
+	"Refresh the currently-displayed passage, applying the changes
+to entity visibility settings."
 	(interactive)
 	(gateway--assert-mode)
 
-	;; TODO: Better preserve the point on heading change.
 	(let ((pos (point)))
 		(erase-buffer)
 		(let ((text (copy-tree (plist-get gateway-data :text))))
