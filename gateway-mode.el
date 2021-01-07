@@ -251,7 +251,7 @@ including verse numbers or headings."
 					(progn (backward-char) (gateway-beginning-of-verse))
 				(user-error "No verse defined at point")))
 		(when pos (goto-char pos))
-		(while (and (not no-align) (string= (get-text-property (point) 'class) "versenum"))
+		(while (and (not no-align) (get-text-property (point) 'class))
 			(forward-char))))
 
 (defun gateway-end-of-verse ()
