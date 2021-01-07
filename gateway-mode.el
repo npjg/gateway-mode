@@ -165,19 +165,14 @@ to entity visibility settings."
 
 	(let ((pos (point)))
 		(erase-buffer)
-		(let ((text (copy-tree (plist-get gateway-data :text))))
-			(when gateway-inhibit-crossrefs
-				(dolist (node (dom-by-class text (regexp-opt '("crossreference" "crossrefs"))))
-					(dom-remove-node text node)))
-			(when gateway-inhibit-footnotes
-				(dolist (node (dom-by-class text "footnote"))
-					(dom-remove-node text node)))
-			(when gateway-inhibit-headings
-				(dolist (node (dom-by-tag text 'h3))
-					(dom-remove-node text node)))
-			(when gateway-inhibit-versenums
-				(dolist (node (dom-by-class text (regexp-opt '("chapternum" "versenum"))))
-					(dom-remove-node text node)))
+		(let ((text (plist-get gateway-data :text)))
+			;; Set visibilities
+			(gateway--refresh-entities (dom-by-class text (regexp-opt '("crossreference" "crossrefs"))) gateway-inhibit-crossrefs)
+			(gateway--refresh-entities (dom-by-class text "footnote") gateway-inhibit-footnotes)
+			(gateway--refresh-entities (dom-by-tag text 'h3) gateway-inhibit-headings)
+			(gateway--refresh-entities (dom-by-class text (regexp-opt '("chapternum" "versenum"))) gateway-inhibit-versenums)
+
+			;; Add advices
 			(advice-add #'shr-tag-span :around #'gateway--shr-tag-span)
 			(advice-add #'shr-tag-a :around #'gateway--shr-tag-a)
 			(shr-insert-document text)
@@ -187,6 +182,10 @@ to entity visibility settings."
 		(shr-insert-document (plist-get gateway-data :copyright))
 		(goto-char pos))
 	(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation))))
+
+(defun gateway--refresh-entities (nodes inhibit)
+	"Refresh the NODES' display property with INHIBIT."
+	(dolist (node nodes) (dom-set-attribute node 'style (format "display:%s" (if inhibit "none" "inline")))))
 
 (defun gateway--shr-tag-span (func &rest r)
 	"Set the verse property for each span. Only intended to advise
