@@ -189,8 +189,9 @@ footnote. Only intended to advise `shr-tag-a'."
 				 (id (cdr (assoc 'href (cadr dom)))))
 		(apply func r)
 		(when (string-match "^#[fc]..-" id)
-			(put-text-property init (point) 'help-echo
-												 (apply #'concatenate 'string (dom-strings (dom-by-id (plist-get gateway-data :text) (substring id 1))))))))
+			(let* ((text (plist-get gateway-data :text))
+						 (rendered (with-temp-buffer (shr-descend (dom-by-id text (substring id 1))) (buffer-substring (point-min) (point-max)))))
+				(put-text-property init (point) 'help-echo rendered)))))
 
 (defun gateway--verse-point ()
 	"Return the reference of the current verse."
