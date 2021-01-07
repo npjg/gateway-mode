@@ -63,7 +63,7 @@ version's abbreviation and full name."
 provided by BibleGateway."
 	(interactive)
 	(let ((version (cdr (gateway--version-completing-read))))
-		(setq gateway-version version)
+		(setq gateway-version (cons version (gateway-fetch-bcv version)))
 		(message (format "Set global BibleGateway version to %s" version))))
 
 (defun gateway-change-version ()
@@ -72,8 +72,19 @@ provided by BibleGateway."
 	(gateway--assert-mode)
 	(let ((bcv (plist-get gateway-data :bcv))
 				(version (cdr (gateway--version-completing-read))))
-		(gateway-get-passage bcv version (buffer-name))
+		(gateway-get-passage bcv (cons version (gateway-fetch-bcv)) (buffer-name))
 		(message "Changed local BibleGateway version to %s" version)))
+
+(defun gateway-fetch-bcv (version)
+	"Fetch the book information for VERSION."
+	(let ((result))
+		(with-current-buffer (url-retrieve-synchronously (format "https://www.biblegateway.com/passage/bcv/?version=%s" version))
+		  (goto-char url-http-end-of-headers)
+		  (let ((json-object-type 'alist)
+					  (json-key-type 'symbol)
+					  (json-array-type 'list))
+				(setq result (mapcar (lambda (book) (assq-delete-all 'chapters book)) (cadar (json-read))))))
+		result))
 
 (defun gateway-get-passage (passage &optional version update)
 	"Load a PASSAGE from BibleGateway. The global version specified
@@ -82,9 +93,11 @@ holds the name of an existing BibleGateway buffer to be updated,
 which will be verified valid before writing."
 	(interactive "MReference: ") ; (format "MReference (%s): " gateway-version))
 	(gateway--check-libxml)
-	(unless gateway-version
+	(unless (car gateway-version)
 		(gateway-set-version))
-	(let* ((version (or version gateway-version))
+	(let* ((data (or version gateway-version))
+				 (version (car data))
+				 (books (cdr data))
 				 (passage-url (format "https://www.biblegateway.com/passage/?search=%s&version=%s&interface=print" passage version)))
 		(with-current-buffer (url-retrieve-synchronously passage-url gateway-inhibit-cookies)
 			(let* ((dom (libxml-parse-html-region (point) (point-max)))
@@ -97,13 +110,13 @@ which will be verified valid before writing."
 				(if update (with-current-buffer update
 							(gateway--assert-mode)
 							(rename-buffer passage-name)
-							(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :translation ,translation))
+							(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation))
 							(gateway-refresh-passage))
 					(with-output-to-temp-buffer passage-name
 						(setq inhibit-read-only t)
 						(pop-to-buffer passage-name)
 						(gateway-display-mode)
-						(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :translation ,translation))
+						(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation))
 						(gateway-refresh-passage)))))))
 
 (defun gateway--assert-mode ()
@@ -256,20 +269,30 @@ footnote. Only intended to advise `shr-tag-a'."
 						 (rendered (with-temp-buffer (shr-descend (dom-by-id text (substring id 1))) (buffer-substring (point-min) (point-max)))))
 				(put-text-property init (point) 'help-echo rendered)))))
 
+(defun gateway--resolve-osis (osis)
+	(gateway--assert-mode)
+	(catch 'found
+		(mapc (lambda (book) (if (string= (alist-get 'osis book) osis) (throw 'found (alist-get 'display book))))
+					(plist-get gateway-data :books))
+		nil))
+
 (defun gateway--verse-point (&optional format)
-	"Return the reference of the current verse."
+	"Return the reference of the current verse in human-readable
+form when FORMAT is non-nil."
 	(gateway--assert-mode)
 	(let ((loc (get-text-property (point) 'verse)))
 		(unless loc (user-error "No verse defined at point"))
 		(if format
 				(let* ((components (split-string loc "-")))
+					(setf (car components) (gateway--resolve-osis (car components)))
 					(apply #'format (push "%s %s:%s" components)))
 			loc)))
 
-(defun gateway-display-verse-point ()
-	"Display the reference of the current verse."
-	(interactive)
-	(message (gateway--verse-point)))
+(defun gateway-display-verse-point (&optional arg)
+	"Display the reference of the current verse. To show the raw
+tag ID, use a non-nil prefix argument."
+	(interactive "P")
+	(message (gateway--verse-point (not arg))))
 
 (defun gateway-beginning-of-verse (&optional no-align)
 	"Move to the beginning of the current verse text. When NO-ALIGN
