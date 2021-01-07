@@ -194,18 +194,21 @@ which will be verified valid before writing."
 						 (translation (car (dom-strings (car (dom-by-class dom "^translation$")))))
 						 (copyright (dom-by-class dom "^copyright-table$"))
 						 (text (dom-by-class dom "^passage-text$"))
-						 (passage-name (format "*BibleGateway: %s (%s)*" bcv version)))
+						 (prev (ignore-errors (dom-attr (car (dom-by-class dom "^prev-chapter$")) 'title)))
+						 (next (ignore-errors (dom-attr (car (dom-by-class dom "^next-chapter$")) 'title)))
+						 (passage-name (format "*BibleGateway: %s (%s)*" bcv version))
+						 (struct `(:version ,version :text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation :prev ,prev :next ,next)))
 				(unless bcv (user-error (format "Could not find passage \"%s\" in version %s" passage version)))
 				(if update (with-current-buffer update
 							(gateway--assert-mode)
-							(rename-buffer passage-name)
-							(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation))
+							(rename-buffer passage-name t)
+							(set (make-local-variable 'gateway-data) struct)
 							(gateway-refresh-passage))
 					(with-output-to-temp-buffer passage-name
 						(setq inhibit-read-only t)
 						(pop-to-buffer passage-name)
 						(gateway-display-mode)
-						(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation))
+						(set (make-local-variable 'gateway-data) struct)
 						(gateway-refresh-passage)))))))
 
 (define-derived-mode gateway-display-mode help-mode "Gateway"
@@ -372,6 +375,22 @@ including verse numbers or headings."
 		(gateway-beginning-of-verse)
 		(when (equal curr (point)) (user-error "No more verses"))
 		(point)))
+
+(defun gateway-left-chapter ()
+	"Move one chapter to the left."
+	(interactive)
+	(gateway--assert-mode)
+	(if (plist-get gateway-data :prev)
+			(gateway-fetch-passage (plist-get gateway-data :prev) nil (current-buffer))
+		(user-error "No more chapters")))
+
+(defun gateway-right-chapter ()
+	"Move one chapter to the right."
+	(interactive)
+	(gateway--assert-mode)
+	(if (plist-get gateway-data :next)
+			(gateway-fetch-passage (plist-get gateway-data :next) nil (current-buffer))
+		(user-error "No more chapters")))
 
 (provide 'gateway-mode)
 
