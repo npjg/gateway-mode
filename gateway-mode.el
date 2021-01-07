@@ -162,8 +162,10 @@ return an alist of the version abbreviation and full name."
 				(dolist (node (dom-by-class text (regexp-opt '("chapternum" "versenum"))))
 					(dom-remove-node text node)))
 			(advice-add #'shr-tag-span :around #'gateway--shr-tag-span)
+			(advice-add #'shr-tag-a :around #'gateway--shr-tag-a)
 			(shr-insert-document text)
-			(advice-remove #'shr-tag-span #'gateway--shr-tag-span))
+			(advice-remove #'shr-tag-span #'gateway--shr-tag-span)
+			(advice-remove #'shr-tag-a #'gateway--shr-tag-a))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
 		(goto-char pos))
@@ -178,6 +180,17 @@ return an alist of the version abbreviation and full name."
 		(apply func r)
 		(when (string= (car classes) "text")
 			(put-text-property init (point) 'verse (cadr classes)))))
+
+(defun gateway--shr-tag-a (func &rest r)
+	"Set the footnote tooltip text to the actual value of the
+footnote. Only intended to advise `shr-tag-a'."
+	(let* ((dom (car r))
+				 (init (point))
+				 (id (cdr (assoc 'href (cadr dom)))))
+		(apply func r)
+		(when (string-match "^#[fc]..-" id)
+			(put-text-property init (point) 'help-echo
+												 (apply #'concatenate 'string (dom-strings (dom-by-id (plist-get gateway-data :text) (substring id 1))))))))
 
 (defun gateway--verse-point ()
 	"Return the reference of the current verse."
