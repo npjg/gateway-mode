@@ -72,13 +72,14 @@ provided by BibleGateway."
 	(gateway--assert-mode)
 	(let ((bcv (plist-get gateway-data :bcv))
 				(version (cdr (gateway--version-completing-read))))
-		(kill-buffer)
-		(gateway-get-passage bcv version)
+		(gateway-get-passage bcv version (buffer-name))
 		(message "Changed local BibleGateway version to %s" version)))
 
-(defun gateway-get-passage (passage &optional version)
+(defun gateway-get-passage (passage &optional version update)
 	"Load a PASSAGE from BibleGateway. The global version specified
-in `gateway-version' is used, unless VERSION is provided."
+in `gateway-version' is used, unless VERSION is provided. UPDATE
+holds the name of an existing BibleGateway buffer to be updated,
+which will be verified valid before writing."
 	(interactive "MReference: ") ; (format "MReference (%s): " gateway-version))
 	(gateway--check-libxml)
 	(unless gateway-version
@@ -92,14 +93,18 @@ in `gateway-version' is used, unless VERSION is provided."
 						 (copyright (dom-by-class dom "^copyright-table$"))
 						 (text (dom-by-class dom "^passage-text$"))
 						 (passage-name (format "*BibleGateway: %s (%s)*" bcv version)))
-				(unless bcv
-					(user-error (format "Could not find passage \"%s\" in version %s" passage version)))
-				(with-output-to-temp-buffer passage-name
-					(setq inhibit-read-only t)
-					(pop-to-buffer passage-name)
-					(gateway-display-mode)
-					(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :translation ,translation))
-					(gateway-refresh-passage))))))
+				(unless bcv (user-error (format "Could not find passage \"%s\" in version %s" passage version)))
+				(if update (with-current-buffer update
+							(gateway--assert-mode)
+							(rename-buffer passage-name)
+							(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :translation ,translation))
+							(gateway-refresh-passage))
+					(with-output-to-temp-buffer passage-name
+						(setq inhibit-read-only t)
+						(pop-to-buffer passage-name)
+						(gateway-display-mode)
+						(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :translation ,translation))
+						(gateway-refresh-passage)))))))
 
 (defun gateway--assert-mode ()
 	"Raise an error if the proper data structures are not resent."
