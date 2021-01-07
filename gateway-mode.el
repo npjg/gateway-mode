@@ -75,6 +75,22 @@ provided by BibleGateway."
 		(gateway-get-passage bcv (cons version (gateway-fetch-bcv)) (buffer-name))
 		(message "Changed local BibleGateway version to %s" version)))
 
+(defun gateway-votd (&optional version)
+	"Display the verse of the day for VERSION."
+	(interactive)
+		(with-current-buffer
+				(url-retrieve-synchronously
+				 (format "https://www.biblegateway.com/votd/get/?format=json&version=%s"
+								 (or version (car gateway-version))))
+		  (goto-char url-http-end-of-headers)
+		  (let* ((json-object-type 'alist)
+					  (json-key-type 'symbol)
+					  (json-array-type 'list)
+						(votd (cdar (json-read))))
+				(when (assoc 'code votd)
+					(user-error (format "BibleGateway: (%s) %s" (cdr (assoc 'code votd)) (cdr (assoc 'message votd)))))
+				(message (format "%s (%s; %s)" (cdr (assoc 'text votd)) (cdr (assoc 'display_ref votd)) (cdr (assoc 'version_id votd)))))))
+
 (defun gateway-fetch-bcv (version)
 	"Fetch the book information for VERSION."
 	(let ((result))
