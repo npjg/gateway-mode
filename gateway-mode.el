@@ -339,6 +339,15 @@ including verse numbers or headings."
 				(user-error "No verse defined at point")))
 		(when pos (goto-char pos))))
 
+(defun gateway-mark-verse ()
+	"Mark the current verse."
+	(interactive)
+	(gateway--assert-mode)
+		(gateway-beginning-of-verse)
+		(set-mark (point))
+		(gateway-end-of-verse)
+		(activate-mark))
+
 (defun gateway-left-verse ()
 	"Move one verse to the left."
 	(gateway-beginning-of-verse t)
