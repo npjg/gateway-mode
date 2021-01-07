@@ -95,6 +95,9 @@ which will be verified valid before writing."
 	(gateway--check-libxml)
 	(unless (car gateway-version)
 		(gateway-set-version))
+	;; TOOD: Let them choose when to jump to new buffer.
+	;; (when (ignore-errors (gateway--assert-mode))
+		;; (setq update (current-buffer)))
 	(let* ((data (or version gateway-version))
 				 (version (car data))
 				 (books (cdr data))
@@ -120,8 +123,9 @@ which will be verified valid before writing."
 						(gateway-refresh-passage)))))))
 
 (defun gateway--assert-mode ()
-	"Raise an error if the proper data structures are not resent."
-	(unless (boundp 'gateway-data)
+	"Raise an error if the proper data structures are not present,
+and return t otherwise."
+	(if (boundp 'gateway-data) t
 		(user-error "Not a BibleGateway buffer")))
 
 (define-derived-mode gateway-display-mode help-mode "Gateway"
