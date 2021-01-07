@@ -139,7 +139,7 @@ provided by BibleGateway."
 	(gateway--assert-mode)
 	(let ((bcv (plist-get gateway-data :bcv))
 				(version (cdr (gateway--version-completing-read))))
-		(gateway-get-passage bcv (cons version (gateway-fetch-bcv version)) (buffer-name))
+		(gateway-fetch-passage bcv (cons version (gateway-fetch-bcv version)) (buffer-name))
 		(message "Changed local BibleGateway version to %s" version)))
 
 (defun gateway-fetch-votd (&optional version)
@@ -199,7 +199,7 @@ which will be verified valid before writing."
 						 (prev (ignore-errors (dom-attr (car (dom-by-class dom "^prev-chapter$")) 'title)))
 						 (next (ignore-errors (dom-attr (car (dom-by-class dom "^next-chapter$")) 'title)))
 						 (passage-name (format "*BibleGateway: %s (%s)*" bcv version))
-						 (struct `(:version ,version :text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation :prev ,prev :next ,next)))
+						 (struct `(:version ,data :text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation :prev ,prev :next ,next)))
 				(unless bcv (user-error (format "Could not find passage \"%s\" in version %s" passage version)))
 				(if update (with-current-buffer update
 							(gateway--assert-mode)
@@ -383,7 +383,7 @@ including verse numbers or headings."
 	(interactive)
 	(gateway--assert-mode)
 	(if (plist-get gateway-data :prev)
-			(gateway-fetch-passage (plist-get gateway-data :prev) nil (current-buffer))
+			(gateway-fetch-passage (plist-get gateway-data :prev) (plist-get gateway-data :version) (current-buffer))
 		(user-error "No more chapters")))
 
 (defun gateway-right-chapter ()
@@ -391,7 +391,7 @@ including verse numbers or headings."
 	(interactive)
 	(gateway--assert-mode)
 	(if (plist-get gateway-data :next)
-			(gateway-fetch-passage (plist-get gateway-data :next) nil (current-buffer))
+			(gateway-fetch-passage (plist-get gateway-data :next) (plist-get gateway-data :version) (current-buffer))
 		(user-error "No more chapters")))
 
 (provide 'gateway-mode)
