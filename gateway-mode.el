@@ -139,7 +139,7 @@ provided by BibleGateway."
 	(gateway--assert-mode)
 	(let ((bcv (plist-get gateway-data :bcv))
 				(version (cdr (gateway--version-completing-read))))
-		(gateway-get-passage bcv (cons version (gateway-fetch-bcv)) (buffer-name))
+		(gateway-get-passage bcv (cons version (gateway-fetch-bcv version)) (buffer-name))
 		(message "Changed local BibleGateway version to %s" version)))
 
 (defun gateway-fetch-votd (&optional version)
