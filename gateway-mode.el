@@ -44,6 +44,16 @@ To modify with available versions, use `gateway-set-version'.")
 	(unless (fboundp 'libxml-parse-html-region)
     (error "This function requires Emacs to be compiled with libxml2")))
 
+(defun gateway--assert-mode ()
+	"Raise an error if the proper data structures are not present,
+and return t otherwise."
+	(if (boundp 'gateway-data) t
+		(user-error "Not a BibleGateway buffer")))
+
+(defun gateway--update-message (entity status)
+	"Display a message when a visibility ENTITY is set to STATUS."
+	(message (format "%s %sabled in current buffer" entity (if status "dis" "en"))))
+
 (defun gateway--version-completing-read ()
 	"Get the static version information from BibleGateway, and
 perform a `completing-read' which returns an alist of the
@@ -57,6 +67,63 @@ version's abbreviation and full name."
 				(unless (assoc 'class (cadr option))
 					(push (cons (caddr option) (cdr (assoc 'value (cadr option)))) results)))
 			(assoc (completing-read "Version: " results nil t) results))))
+
+(defun gateway--refresh-entities (nodes inhibit)
+	"Refresh the NODES' display property with INHIBIT."
+	(dolist (node nodes) (dom-set-attribute node 'style (format "display:%s" (if inhibit "none" "inline")))))
+
+(defun gateway--shr-tag-span (func &rest r)
+	"Set the verse property for each span. Only intended to advise
+`shr-tag-span'."
+	(let* ((dom (car r))
+				 (init (point))
+				 (classes (split-string (cdr (assoc 'class (cadr dom))))))
+		(apply func r)
+		(when (string= (car classes) "text")
+			(put-text-property init (point) 'start init)
+			(put-text-property init (point) 'end (point))
+			(put-text-property init (point) 'verse (cadr classes)))))
+
+(defun gateway--shr-tag-sup (func &rest r)
+	"Set the verse property for each sup. Only intended to advise
+`shr-tag-sup'."
+		(let* ((dom (car r))
+					 (init (point))
+					 (class (cdr (assoc 'class (cadr dom)))))
+			(apply func r)
+			(put-text-property init (point) 'class class)))
+
+(defun gateway--shr-tag-a (func &rest r)
+	"Set the footnote tooltip text to the actual value of the
+footnote. Only intended to advise `shr-tag-a'."
+	(let* ((dom (car r))
+				 (init (point))
+				 (id (cdr (assoc 'href (cadr dom)))))
+		(apply func r)
+		(when (string-match "^#[fc]..-" id)
+			(let* ((text (plist-get gateway-data :text))
+						 (rendered (with-temp-buffer (shr-descend (dom-by-id text (substring id 1))) (buffer-substring (point-min) (point-max)))))
+				(put-text-property init (point) 'help-echo rendered)))))
+
+(defun gateway--resolve-osis (osis)
+	"Convert standard book abbrevation OSIS to human-friendly form."
+	(gateway--assert-mode)
+	(catch 'found
+		(mapc (lambda (book) (if (string= (alist-get 'osis book) osis) (throw 'found (alist-get 'display book))))
+					(plist-get gateway-data :books))
+		nil))
+
+(defun gateway--verse-point (&optional format)
+	"Return the reference of the current verse in human-readable
+form when FORMAT is non-nil."
+	(gateway--assert-mode)
+	(let ((loc (get-text-property (point) 'verse)))
+		(unless loc (user-error "No verse defined at point"))
+		(if format
+				(let* ((components (split-string loc "-")))
+					(setf (car components) (gateway--resolve-osis (car components)))
+					(apply #'format (push "%s %s:%s" components)))
+			loc)))
 
 (defun gateway-set-version ()
 	"Set the global `gateway-version' with the valid options
@@ -75,7 +142,7 @@ provided by BibleGateway."
 		(gateway-get-passage bcv (cons version (gateway-fetch-bcv)) (buffer-name))
 		(message "Changed local BibleGateway version to %s" version)))
 
-(defun gateway-votd (&optional version)
+(defun gateway-fetch-votd (&optional version)
 	"Display the verse of the day for VERSION."
 	(interactive)
 		(with-current-buffer
@@ -105,7 +172,7 @@ provided by BibleGateway."
 					(setq result (mapcar (lambda (book) (assq-delete-all 'chapters book)) (cadar raw))))))
 		result))
 
-(defun gateway-get-passage (passage &optional version update)
+(defun gateway-fetch-passage (passage &optional version update)
 	"Load a PASSAGE from BibleGateway. The global version specified
 in `gateway-version' is used, unless VERSION is provided. UPDATE
 holds the name of an existing BibleGateway buffer to be updated,
@@ -141,12 +208,6 @@ which will be verified valid before writing."
 						(set (make-local-variable 'gateway-data) `(:text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation))
 						(gateway-refresh-passage)))))))
 
-(defun gateway--assert-mode ()
-	"Raise an error if the proper data structures are not present,
-and return t otherwise."
-	(if (boundp 'gateway-data) t
-		(user-error "Not a BibleGateway buffer")))
-
 (define-derived-mode gateway-display-mode help-mode "Gateway"
 	"Major mode for displaying Gateway passages."
 	(setq gateway-display-mode-map (make-sparse-keymap))
@@ -160,10 +221,6 @@ and return t otherwise."
 	(run-hooks 'gateway-display-mode-hook)
 	;; :group gateway
 	)
-
-(defun gateway--update-message (entity status)
-	"Display a message when a visibility ENTITY is set to STATUS."
-	(message (format "%s %sabled in current buffer" entity (if status "dis" "en"))))
 
 (defun gateway-toggle-crossrefs ()
 	"Toggle the display of footnotes in the current BibleGateway buffer."
@@ -255,62 +312,6 @@ which withstands changing the visibility of Scripture elements."
 		;; (when (>= (point) end) (user-error "Could not restore point"))))
 	)
 
-(defun gateway--refresh-entities (nodes inhibit)
-	"Refresh the NODES' display property with INHIBIT."
-	(dolist (node nodes) (dom-set-attribute node 'style (format "display:%s" (if inhibit "none" "inline")))))
-
-(defun gateway--shr-tag-span (func &rest r)
-	"Set the verse property for each span. Only intended to advise
-`shr-tag-span'."
-	(let* ((dom (car r))
-				 (init (point))
-				 (classes (split-string (cdr (assoc 'class (cadr dom))))))
-		(apply func r)
-		(when (string= (car classes) "text")
-			(put-text-property init (point) 'start init)
-			(put-text-property init (point) 'end (point))
-			(put-text-property init (point) 'verse (cadr classes)))))
-
-(defun gateway--shr-tag-sup (func &rest r)
-	"Set the verse property for each sup. Only intended to advise
-`shr-tag-sup'."
-		(let* ((dom (car r))
-					 (init (point))
-					 (class (cdr (assoc 'class (cadr dom)))))
-			(apply func r)
-			(put-text-property init (point) 'class class)))
-
-(defun gateway--shr-tag-a (func &rest r)
-	"Set the footnote tooltip text to the actual value of the
-footnote. Only intended to advise `shr-tag-a'."
-	(let* ((dom (car r))
-				 (init (point))
-				 (id (cdr (assoc 'href (cadr dom)))))
-		(apply func r)
-		(when (string-match "^#[fc]..-" id)
-			(let* ((text (plist-get gateway-data :text))
-						 (rendered (with-temp-buffer (shr-descend (dom-by-id text (substring id 1))) (buffer-substring (point-min) (point-max)))))
-				(put-text-property init (point) 'help-echo rendered)))))
-
-(defun gateway--resolve-osis (osis)
-	(gateway--assert-mode)
-	(catch 'found
-		(mapc (lambda (book) (if (string= (alist-get 'osis book) osis) (throw 'found (alist-get 'display book))))
-					(plist-get gateway-data :books))
-		nil))
-
-(defun gateway--verse-point (&optional format)
-	"Return the reference of the current verse in human-readable
-form when FORMAT is non-nil."
-	(gateway--assert-mode)
-	(let ((loc (get-text-property (point) 'verse)))
-		(unless loc (user-error "No verse defined at point"))
-		(if format
-				(let* ((components (split-string loc "-")))
-					(setf (car components) (gateway--resolve-osis (car components)))
-					(apply #'format (push "%s %s:%s" components)))
-			loc)))
-
 (defun gateway-display-verse-point (&optional arg)
 	"Display the reference of the current verse. To show the raw
 tag ID, use a non-nil prefix argument."
@@ -373,4 +374,5 @@ including verse numbers or headings."
 		(point)))
 
 (provide 'gateway-mode)
+
 ;;; gateway-mode.el ends here
