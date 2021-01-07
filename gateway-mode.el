@@ -167,8 +167,7 @@ which will be verified valid before writing."
 to entity visibility settings."
 	(interactive)
 	(gateway--assert-mode)
-
-	(let ((pos (point)))
+	(let ((resilient (gateway--get-resilient-position)))
 		(erase-buffer)
 		(let ((text (plist-get gateway-data :text)))
 			;; Set visibilities
@@ -188,8 +187,37 @@ to entity visibility settings."
 		(plist-put gateway-data :end (1- (point)))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
-		(goto-char pos))
+		(apply #'gateway--restore-resilient-position resilient))
 	(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation))))
+
+(defun gateway-find-verse (verse)
+	"Find the verse with ID VERSE, and jump to its beginning as
+given by `gateway-beginning-of-verse'."
+	(let ((pos (point)))
+		(goto-char (point-min))
+		(while (not (string= (get-text-property (point) 'verse) verse))
+			(when (or (>= (point) (plist-get gateway-data :end))
+								(not (ignore-errors (gateway-right-verse))))
+				(goto-char pos)
+				(user-error (format "Verse ID \"%s\" not found in current selection" verse))))
+		(gateway-beginning-of-verse)))
+
+(defun gateway--get-resilient-position ()
+	"Return a position in terms of spaces within the current verse,
+which withstands changing the visibility of Scripture elements."
+	(let* ((end (point))
+				 (start (progn (gateway-beginning-of-verse) (point)))
+				 (verse (gateway--verse-point))
+				 (segment (buffer-substring start end)))
+		(list verse)))
+
+(defun gateway--restore-resilient-position (verse)
+	"Restore a resilient position from `gateway--get-resilient-position'."
+	(gateway-find-verse verse)
+	;; (let ((end (get-text-property (point) 'verse)))
+		;; (search-forward key)
+		;; (when (>= (point) end) (user-error "Could not restore point"))))
+	)
 
 (defun gateway--refresh-entities (nodes inhibit)
 	"Refresh the NODES' display property with INHIBIT."
@@ -228,13 +256,15 @@ footnote. Only intended to advise `shr-tag-a'."
 						 (rendered (with-temp-buffer (shr-descend (dom-by-id text (substring id 1))) (buffer-substring (point-min) (point-max)))))
 				(put-text-property init (point) 'help-echo rendered)))))
 
-(defun gateway--verse-point ()
+(defun gateway--verse-point (&optional format)
 	"Return the reference of the current verse."
 	(gateway--assert-mode)
 	(let ((loc (get-text-property (point) 'verse)))
 		(unless loc (user-error "No verse defined at point"))
-		(let* ((components (split-string loc "-")))
-			(apply #'format (push "%s %s:%s" components)))))
+		(if format
+				(let* ((components (split-string loc "-")))
+					(apply #'format (push "%s %s:%s" components)))
+			loc)))
 
 (defun gateway-display-verse-point ()
 	"Display the reference of the current verse."
@@ -267,13 +297,17 @@ including verse numbers or headings."
 	"Move one verse to the left."
 	(gateway-beginning-of-verse t)
 	(backward-char)
-	(gateway-beginning-of-verse))
+	(gateway-beginning-of-verse)
+	(point))
 
 (defun gateway-right-verse ()
 	"Move one verse to the right."
-	(gateway-end-of-verse)
-	(forward-char 2)
-	(gateway-beginning-of-verse))
+	(let ((curr (point)))
+		(gateway-end-of-verse)
+		(forward-char 2)
+		(gateway-beginning-of-verse)
+		(when (equal curr (point)) (user-error "No more verses"))
+		(point)))
 
 (provide 'gateway-mode)
 ;;; gateway-mode.el ends here
