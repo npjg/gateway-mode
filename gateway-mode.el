@@ -321,6 +321,8 @@ tag ID, use a non-nil prefix argument."
 	"Move to the beginning of the current verse text. When NO-ALIGN
 is non-nil, the point is set to the logical start of the verse,
 including verse numbers or headings."
+	(interactive "P")
+	(gateway--assert-mode)
 	(let ((pos (get-text-property (point) 'start)))
 		(unless (get-text-property (point) 'verse)
 			(if (<= (point) (plist-get gateway-data :end))
@@ -332,6 +334,8 @@ including verse numbers or headings."
 
 (defun gateway-end-of-verse ()
 	"Move to the end of the current verse."
+	(interactive)
+	(gateway--assert-mode)
 	(let ((pos (get-text-property (point) 'end)))
 		(unless (get-text-property (point) 'verse)
 			(if (<= (point) (plist-get gateway-data :end))
@@ -350,6 +354,8 @@ including verse numbers or headings."
 
 (defun gateway-left-verse ()
 	"Move one verse to the left."
+	(interactive)
+	(gateway--assert-mode)
 	(gateway-beginning-of-verse t)
 	(backward-char)
 	(gateway-beginning-of-verse)
@@ -357,6 +363,8 @@ including verse numbers or headings."
 
 (defun gateway-right-verse ()
 	"Move one verse to the right."
+	(interactive)
+	(gateway--assert-mode)
 	(let ((curr (point)))
 		(gateway-end-of-verse)
 		(forward-char 2)
