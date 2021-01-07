@@ -173,11 +173,14 @@ to entity visibility settings."
 			(gateway--refresh-entities (dom-by-class text (regexp-opt '("chapternum" "versenum"))) gateway-inhibit-versenums)
 
 			;; Add advices
+			(advice-add #'shr-tag-sup :around #'gateway--shr-tag-sup)
 			(advice-add #'shr-tag-span :around #'gateway--shr-tag-span)
 			(advice-add #'shr-tag-a :around #'gateway--shr-tag-a)
 			(shr-insert-document text)
+			(advice-remove #'shr-tag-sup #'gateway--shr-tag-sup)
 			(advice-remove #'shr-tag-span #'gateway--shr-tag-span)
 			(advice-remove #'shr-tag-a #'gateway--shr-tag-a))
+		(plist-put gateway-data :end (1- (point)))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
 		(goto-char pos))
@@ -195,7 +198,18 @@ to entity visibility settings."
 				 (classes (split-string (cdr (assoc 'class (cadr dom))))))
 		(apply func r)
 		(when (string= (car classes) "text")
+			(put-text-property init (point) 'start init)
+			(put-text-property init (point) 'end (point))
 			(put-text-property init (point) 'verse (cadr classes)))))
+
+(defun gateway--shr-tag-sup (func &rest r)
+	"Set the verse property for each sup. Only intended to advise
+`shr-tag-sup'."
+		(let* ((dom (car r))
+					 (init (point))
+					 (class (cdr (assoc 'class (cadr dom)))))
+			(apply func r)
+			(put-text-property init (point) 'class class)))
 
 (defun gateway--shr-tag-a (func &rest r)
 	"Set the footnote tooltip text to the actual value of the
@@ -213,8 +227,7 @@ footnote. Only intended to advise `shr-tag-a'."
 	"Return the reference of the current verse."
 	(gateway--assert-mode)
 	(let ((loc (get-text-property (point) 'verse)))
-		(unless loc
-			(user-error "No verse defined at point"))
+		(unless loc (user-error "No verse defined at point"))
 		(let* ((components (split-string loc "-")))
 			(apply #'format (push "%s %s:%s" components)))))
 
@@ -222,6 +235,40 @@ footnote. Only intended to advise `shr-tag-a'."
 	"Display the reference of the current verse."
 	(interactive)
 	(message (gateway--verse-point)))
+
+(defun gateway-beginning-of-verse (&optional no-align)
+	"Move to the beginning of the current verse text. When NO-ALIGN
+is non-nil, the point is set to the logical start of the verse,
+including verse numbers or headings."
+	(let ((pos (get-text-property (point) 'start)))
+		(unless (get-text-property (point) 'verse)
+			(if (<= (point) (plist-get gateway-data :end))
+					(progn (backward-char) (gateway-beginning-of-verse))
+				(user-error "No verse defined at point")))
+		(when pos (goto-char pos))
+		(while (and (not no-align) (string= (get-text-property (point) 'class) "versenum"))
+			(forward-char))))
+
+(defun gateway-end-of-verse ()
+	"Move to the end of the current verse."
+	(let ((pos (get-text-property (point) 'end)))
+		(unless (get-text-property (point) 'verse)
+			(if (<= (point) (plist-get gateway-data :end))
+					(progn (backward-char) (gateway-end-of-verse))
+				(user-error "No verse defined at point")))
+		(when pos (goto-char pos))))
+
+(defun gateway-left-verse ()
+	"Move one verse to the left."
+	(gateway-beginning-of-verse t)
+	(backward-char)
+	(gateway-beginning-of-verse))
+
+(defun gateway-right-verse ()
+	"Move one verse to the right."
+	(gateway-end-of-verse)
+	(forward-char 2)
+	(gateway-beginning-of-verse))
 
 (provide 'gateway-mode)
 ;;; gateway-mode.el ends here
