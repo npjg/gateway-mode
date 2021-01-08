@@ -156,10 +156,16 @@ provided by BibleGateway."
 		(let* ((json-object-type 'alist)
 					 (json-key-type 'symbol)
 					 (json-array-type 'list)
-					 (votd (cdar (json-read))))
+					 (votd (cdar (json-read)))
+					 (display-dom (with-temp-buffer
+							(insert (cdr (assoc 'content votd)))
+							(libxml-parse-html-region (point-min) (point-max)))))
 			(when (assoc 'code votd)
 				(user-error (format "BibleGateway: (%s) %s" (cdr (assoc 'code votd)) (cdr (assoc 'message votd)))))
-			(message (format "%s (%s; %s)" (cdr (assoc 'text votd)) (cdr (assoc 'display_ref votd)) (cdr (assoc 'version_id votd)))))))
+			(message (format "%s (%s; %s)"
+											 (progn (with-temp-buffer (shr-descend display-dom) (buffer-substring (point-min) (point-max))))
+											 (cdr (assoc 'display_ref votd))
+											 (cdr (assoc 'version_id votd)))))))
 
 (defun gateway-fetch-bcv (version)
 	"Fetch the book information for VERSION."
