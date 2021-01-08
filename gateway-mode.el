@@ -113,6 +113,14 @@ footnote. Only intended to advise `shr-tag-a'."
 					(plist-get gateway-data :books))
 		nil))
 
+(defun gateway-get-version ()
+	"Get the global `gateway-get-version', and set it if it is not
+fully set."
+	(unless gateway-version (gateway-set-version))
+	(when (stringp gateway-version)
+		(setq gateway-version (cons gateway-version (gateway-fetch-bcv gateway-version))))
+	gateway-version)
+
 (defun gateway-fetch-version ()
 	"Read version information and return a cons cell with version
 	information to be used by `gateway-fetch-version'."
@@ -139,8 +147,7 @@ provided by BibleGateway."
 (defun gateway-fetch-votd (&optional version)
 	"Display the verse of the day for VERSION."
 	(interactive)
-	(unless (or version (car gateway-version))
-		(gateway-set-version))
+	(unless version (gateway-get-version))
 	(with-current-buffer
 			(url-retrieve-synchronously
 			 (format "https://www.biblegateway.com/votd/get/?format=json&version=%s"
@@ -179,8 +186,7 @@ the name of an existing BibleGateway buffer to be updated, which
 will be verified valid before writing."
 	(interactive "MReference: \nP")
 	(gateway--check-libxml)
-	(when (and (not version) (not (car gateway-version)))
-		(gateway-set-version))
+	(unless version (gateway-get-version))
 	;; TOOD: Let them choose when to jump to new buffer.
 	;; (when (ignore-errors (gateway--assert-mode))
 		;; (setq update (current-buffer)))
