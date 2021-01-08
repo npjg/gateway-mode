@@ -113,17 +113,6 @@ footnote. Only intended to advise `shr-tag-a'."
 					(plist-get gateway-data :books))
 		nil))
 
-(defun gateway--verse-point (&optional format)
-	"Return the reference of the current verse in human-readable
-form when FORMAT is non-nil."
-	(gateway--assert-mode)
-	(let ((loc (get-text-property (point) 'verse)))
-		(unless loc (user-error "No verse defined at point"))
-		(if format
-				(let* ((components (split-string loc "-")))
-					(setf (car components) (gateway--resolve-osis (car components)))
-					(apply #'format (push "%s %s:%s" components)))
-			loc)))
 (defun gateway-fetch-version ()
 	"Read version information and return a cons cell with version
 	information to be used by `gateway-fetch-version'."
@@ -328,11 +317,29 @@ which withstands changing the visibility of Scripture elements."
 		;; (when (>= (point) end) (user-error "Could not restore point"))))
 	)
 
-(defun gateway-display-verse-point (&optional arg)
+(defun gateway-get-verse-at-point (&optional format)
+	"Return the reference of the current verse in human-readable
+form when FORMAT is non-nil."
+	(gateway--assert-mode)
+	(let ((loc (get-text-property (point) 'verse)))
+		(unless loc (user-error "No verse defined at point"))
+		(if format
+				(let* ((components (split-string loc "-")))
+					(setf (car components) (gateway--resolve-osis (car components)))
+					(apply #'format (push "%s %s:%s" components)))
+			loc)))
+
+(defun gateway-show-verse-at-point (&optional arg)
 	"Display the reference of the current verse. To show the raw
 tag ID, use a non-nil prefix argument."
 	(interactive "P")
-	(message (gateway--verse-point (not arg))))
+	(message (gateway-get-verse-at-point (not arg))))
+
+(defun gateway--next-non-nil-single-char-property-change (position prop &optional object limit orig)
+	(unless orig
+		(setq orig (get-text-property position prop object)))
+	(next-single-char-property-change position prop object limit)
+	)
 
 (defun gateway-beginning-of-verse (&optional no-align)
 	"Move to the beginning of the current verse text. When NO-ALIGN
