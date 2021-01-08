@@ -124,14 +124,19 @@ form when FORMAT is non-nil."
 					(setf (car components) (gateway--resolve-osis (car components)))
 					(apply #'format (push "%s %s:%s" components)))
 			loc)))
+(defun gateway-fetch-version ()
+	"Read version information and return a cons cell with version
+	information to be used by `gateway-fetch-version'."
+	(let ((version (cdr (gateway--version-completing-read))))
+		(cons version (gateway-fetch-bcv version))))
 
 (defun gateway-set-version ()
 	"Set the global `gateway-version' with the valid options
 provided by BibleGateway."
 	(interactive)
-	(let ((version (cdr (gateway--version-completing-read))))
-		(setq gateway-version (cons version (gateway-fetch-bcv version)))
-		(message (format "Set global BibleGateway version to %s" version))))
+	(let ((version (gateway-fetch-version)))
+		(setq gateway-version version)
+		(message (format "Set global BibleGateway version to %s" (car version)))))
 
 (defun gateway-change-version ()
 	"Change the version for the current passage only."
@@ -176,17 +181,23 @@ provided by BibleGateway."
 
 (defun gateway-fetch-passage (passage &optional version update)
 	"Load a PASSAGE from BibleGateway. The global version specified
-in `gateway-version' is used, unless VERSION is provided. UPDATE
-holds the name of an existing BibleGateway buffer to be updated,
-which will be verified valid before writing."
-	(interactive "MReference: ") ; (format "MReference (%s): " gateway-version))
+in `gateway-version' is used, unless VERSION is non-nil. When
+called interactively, VERSION is a prefix argument that, when
+non-nil, causes the version to be read for the current lookup
+only. Otherwise, VERSION holds a result from
+`gateway-fetch-version' for the current lookup only. UPDATE holds
+the name of an existing BibleGateway buffer to be updated, which
+will be verified valid before writing."
+	(interactive "MReference: \nP")
 	(gateway--check-libxml)
-	(unless (car gateway-version)
+	(when (and (not version) (not (car gateway-version)))
 		(gateway-set-version))
 	;; TOOD: Let them choose when to jump to new buffer.
 	;; (when (ignore-errors (gateway--assert-mode))
 		;; (setq update (current-buffer)))
-	(let* ((data (or version gateway-version))
+	(let* ((data (if (and (called-interactively-p) version)
+							(gateway-fetch-version)
+						(or version gateway-version)))
 				 (version (car data))
 				 (books (cdr data))
 				 (passage-url (format "https://www.biblegateway.com/passage/?search=%s&version=%s&interface=print" passage version)))
