@@ -325,14 +325,17 @@ which withstands changing the visibility of Scripture elements."
 
 (defun gateway-get-verse-at-point (&optional format)
 	"Return the reference of the current verse in human-readable
-form when FORMAT is non-nil."
+form when FORMAT is non-nil.
+
+When FORMAT is :biblehub, format the verse in accord with
+BibleHub's URL scheme."
 	(gateway--assert-mode)
 	(let ((loc (get-text-property (point) 'verse)))
 		(unless loc (user-error "No verse defined at point"))
 		(if format
 				(let* ((components (split-string loc "-")))
 					(setf (car components) (gateway--resolve-osis (car components)))
-					(apply #'format (push "%s %s:%s" components)))
+					(apply #'format (push (if (eq format :biblehub) "%s/%s-%s" "%s %s:%s") components)))
 			loc)))
 
 (defun gateway-show-verse-at-point (&optional arg)
