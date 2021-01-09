@@ -79,19 +79,26 @@ version's abbreviation and full name."
 				 (init (point))
 				 (classes (split-string (cdr (assoc 'class (cadr dom))))))
 		(apply func r)
-		(when (string= (car classes) "text")
-			(put-text-property init (point) 'start init)
-			(put-text-property init (point) 'end (point))
-			(put-text-property init (point) 'verse (cadr classes)))))
+		(when (and (not (string= (cadr classes) last-verse)) (string= (car classes) "text"))
+			(put-text-property init (1+ init) 'verse (cadr classes))
+			(setq last-verse (cadr classes)))))
 
 (defun gateway--shr-tag-sup (func &rest r)
-	"Set the verse property for each sup. Only intended to advise
+	"Set the class for each sup. Only intended to advise
 `shr-tag-sup'."
 		(let* ((dom (car r))
 					 (init (point))
 					 (class (cdr (assoc 'class (cadr dom)))))
 			(apply func r)
 			(put-text-property init (point) 'class class)))
+
+(defun gateway--shr-tag-h3 (func &rest r)
+	"Set the heading class for each h3. Only intended to advise
+`shr-tag-h3'."
+	(let* ((dom (car r))
+				 (init (point)))
+		(apply func r)
+		(put-text-property init (point) 'class 'heading)))
 
 (defun gateway--shr-tag-a (func &rest r)
 	"Set the footnote tooltip text to the actual value of the
@@ -194,8 +201,8 @@ will be verified valid before writing."
 	(gateway--check-libxml)
 	(unless version (gateway-get-version))
 	;; TOOD: Let them choose when to jump to new buffer.
-	;; (when (ignore-errors (gateway--assert-mode))
-		;; (setq update (current-buffer)))
+	(when (ignore-errors (gateway--assert-mode))
+		(setq update (current-buffer)))
 	(let* ((data (if (and (called-interactively-p) version)
 							(gateway-fetch-version)
 						(or version gateway-version)))
@@ -233,7 +240,7 @@ will be verified valid before writing."
 	(define-key gateway-display-mode-map "F" #'gateway-toggle-footnotes)
 	(define-key gateway-display-mode-map "H" #'gateway-toggle-headings)
 	(define-key gateway-display-mode-map "V" #'gateway-toggle-versenums)
-	(define-key gateway-display-mode-map "P" #'gateway-display-verse-point)
+	(define-key gateway-display-mode-map "P" #'gateway-show-verse-at-point)
 	(use-local-map gateway-display-mode-map)
 	(run-hooks 'gateway-display-mode-hook)
 	;; :group gateway
@@ -277,9 +284,11 @@ will be verified valid before writing."
 to entity visibility settings."
 	(interactive)
 	(gateway--assert-mode)
-	(let ((resilient (gateway--get-resilient-position)))
+
+	(let ((pos (point)))
 		(erase-buffer)
-		(let ((text (plist-get gateway-data :text)))
+		(let ((text (plist-get gateway-data :text))
+					(last-verse nil))
 			;; Set visibilities
 			(gateway--refresh-entities (dom-by-class text (regexp-opt '("crossreference" "crossrefs"))) gateway-inhibit-crossrefs)
 			(gateway--refresh-entities (dom-by-class text "footnote") gateway-inhibit-footnotes)
@@ -290,14 +299,16 @@ to entity visibility settings."
 			(advice-add #'shr-tag-sup :around #'gateway--shr-tag-sup)
 			(advice-add #'shr-tag-span :around #'gateway--shr-tag-span)
 			(advice-add #'shr-tag-a :around #'gateway--shr-tag-a)
+			(advice-add #'shr-tag-h3 :around #'gateway--shr-tag-h3)
 			(shr-insert-document text)
 			(advice-remove #'shr-tag-sup #'gateway--shr-tag-sup)
 			(advice-remove #'shr-tag-span #'gateway--shr-tag-span)
-			(advice-remove #'shr-tag-a #'gateway--shr-tag-a))
+			(advice-remove #'shr-tag-a #'gateway--shr-tag-a)
+			(advice-remove #'shr-tag-h3 #'gateway--shr-tag-h3))
 		(plist-put gateway-data :end (1- (point)))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
-		(apply #'gateway--restore-resilient-position resilient))
+		(goto-char pos))
 	(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation))))
 
 (defun gateway-find-verse (verse)
@@ -329,87 +340,91 @@ which withstands changing the visibility of Scripture elements."
 		;; (when (>= (point) end) (user-error "Could not restore point"))))
 	)
 
-(defun gateway-get-verse-at-point (&optional format)
+(defun gateway-get-verse-at-point (&optional format move-to-beginning)
 	"Return the reference of the current verse in human-readable
 form when FORMAT is non-nil.
 
 When FORMAT is :biblehub, format the verse in accord with
 BibleHub's URL scheme."
 	(gateway--assert-mode)
-	(let ((loc (get-text-property (point) 'verse)))
-		(unless loc (user-error "No verse defined at point"))
-		(if format
-				(let* ((components (split-string loc "-")))
-					(setf (car components) (gateway--resolve-osis (car components)))
-					(apply #'format (push (if (eq format :biblehub) "%s/%s-%s" "%s %s:%s") components)))
-			loc)))
+	(save-excursion
+		(unless move-to-beginning (gateway-beginning-of-verse))
+		(let ((loc (get-text-property (point) 'verse)))
+			(unless loc (user-error "No verse defined at point"))
+			(if format
+					(let* ((components (split-string loc "-")))
+						(setf (car components) (gateway--resolve-osis (car components)))
+						(apply #'format (push (if (eq format :biblehub) "%s/%s-%s" "%s %s:%s") components)))
+				loc))))
 
-(defun gateway-show-verse-at-point (&optional arg)
+(defun gateway-show-verse-at-point (&optional arg loc)
 	"Display the reference of the current verse. To show the raw
 tag ID, use a non-nil prefix argument."
 	(interactive "P")
-	(message (gateway-get-verse-at-point (not arg))))
+	(save-excursion (goto-char (or loc (point))) (message (gateway-get-verse-at-point (not arg)))))
 
-(defun gateway--next-non-nil-single-char-property-change (position prop &optional object limit orig)
-	(unless orig
-		(setq orig (get-text-property position prop object)))
-	(next-single-char-property-change position prop object limit)
-	)
+(defun gateway--position-point (forward)
+	"Position the point at the beginning of the current verse, or
+the end of the current verse if FORWARD is non-nil."
+	(gateway--assert-mode)
+	(when (> (point) (plist-get gateway-data :end))
+		(user-error "No verse defined at point"))
+	(let ((start (point)))
+		(while (or (not (get-text-property (point) 'verse)) (= start (point)))
+			(if forward (right-char) (left-char))
+			(when (> (point) (plist-get gateway-data :end)) (user-error "No more verses")))))
 
-(defun gateway-beginning-of-verse (&optional no-align)
-	"Move to the beginning of the current verse text. When NO-ALIGN
-is non-nil, the point is set to the logical start of the verse,
-including verse numbers or headings."
+(defun gateway-beginning-of-verse (&optional actual-start)
+	"Move to the beginning of the current verse text. When
+ACTUAL-START is non-nil, the point is set to the real start of
+the verse, including verse numbers, footnotes, cross-references,
+and headings. Otherwise, the point is set to the first word of
+the verse."
 	(interactive "P")
 	(gateway--assert-mode)
-	(let ((pos (get-text-property (point) 'start)))
-		(unless (get-text-property (point) 'verse)
-			(if (<= (point) (plist-get gateway-data :end))
-					(progn (backward-char) (gateway-beginning-of-verse))
-				(user-error "No verse defined at point")))
-		(when pos (goto-char pos))
-		(while (and (not no-align) (get-text-property (point) 'class))
-			(forward-char))))
+	(unless (get-text-property (point) 'verse)
+		(gateway--position-point nil))
+	(unless actual-start
+		(while (and (<= (point) (plist-get gateway-data :end))
+								(get-text-property (point) 'class))
+			(goto-char (next-single-char-property-change (point) 'class))))
+	(message (gateway-get-verse-at-point nil t)))
 
 (defun gateway-end-of-verse ()
 	"Move to the end of the current verse."
 	(interactive)
 	(gateway--assert-mode)
-	(let ((pos (get-text-property (point) 'end)))
-		(unless (get-text-property (point) 'verse)
-			(if (<= (point) (plist-get gateway-data :end))
-					(progn (backward-char) (gateway-end-of-verse))
-				(user-error "No verse defined at point")))
-		(when pos (goto-char pos))))
+	(unless (get-text-property (1+ (point)) 'verse)
+		(gateway--position-point t)
+		(left-char))
+	(messsage (gateway-get-verse-at-point nil t)))
 
-(defun gateway-mark-verse ()
-	"Mark the current verse."
-	(interactive)
+(defun gateway-mark-verse (&optional actual-start)
+	"Mark the current verse, using ACTUAL-START as it is described
+in `gateway-beginning-of-verse'."
+	(interactive "P")
 	(gateway--assert-mode)
-		(gateway-beginning-of-verse)
-		(set-mark (point))
-		(gateway-end-of-verse)
-		(activate-mark))
+	(gateway-beginning-of-verse actual-start)
+	(set-mark (point))
+	(gateway-end-of-verse)
+	(activate-mark))
 
-(defun gateway-left-verse ()
-	"Move one verse to the left."
-	(interactive)
+(defun gateway-left-verse (&optional actual-start)
+	"Move one verse to the left. using ACTUAL-START as it is described
+in `gateway-beginning-of-verse'."
+	(interactive "P")
 	(gateway--assert-mode)
 	(gateway-beginning-of-verse t)
-	(backward-char)
-	(gateway-beginning-of-verse)
-	(point))
+	(left-char)
+	(gateway-beginning-of-verse actual-start))
 
-(defun gateway-right-verse ()
-	"Move one verse to the right."
+(defun gateway-right-verse (&optional actual-start)
+	"Move one verse to the right. using ACTUAL-START as it is
+described in `gateway-beginning-of-verse'."
 	(interactive)
 	(gateway--assert-mode)
-	(let ((curr (point)))
-		(gateway-end-of-verse)
-		(forward-char 2)
-		(gateway-beginning-of-verse)
-		(when (equal curr (point)) (user-error "No more verses"))
-		(point)))
+	(gateway--position-point t)
+	(gateway-beginning-of-verse actual-start))
 
 (defun gateway-left-chapter ()
 	"Move one chapter to the left."
