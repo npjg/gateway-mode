@@ -266,6 +266,8 @@ overriides the global `gateway-reuse-same-buffer' setting."
 						 (next (ignore-errors (dom-attr (car (dom-by-class dom "^next-chapter$")) 'title)))
 						 (passage-name (format "*BibleGateway: %s (%s)*" bcv version))
 						 (struct `(:version ,data :text ,text :copyright ,copyright :bcv ,bcv :books ,books :translation ,translation :prev ,prev :next ,next)))
+				(dolist (class '("full-chap-link" "passage-other-trans"))
+					(dom-remove-node dom (car (dom-by-class dom class))))
 				(unless bcv (user-error (format "Could not find passage \"%s\" in version %s" passage version)))
 				(if update (with-current-buffer update
 							(gateway--assert-mode)
