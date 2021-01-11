@@ -24,7 +24,7 @@ To modify with available versions, use `gateway-set-version'.")
 (defvar gateway-inhibit-cookies t
 	"If non-nil, inhibit cookies in BibleGateway URL requests.")
 
-(defvar gateway-inhibit-crossrefs nil
+(defvar gateway-inhibit-crossrefs t
 	"If non-nil, inhibit BibleGateway cross-references.")
 
 (defvar gateway-inhibit-footnotes nil
