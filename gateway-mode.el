@@ -438,7 +438,7 @@ in `gateway-beginning-of-verse'."
 (defun gateway-right-verse (&optional actual-start)
 	"Move one verse to the right. using ACTUAL-START as it is
 described in `gateway-beginning-of-verse'."
-	(interactive)
+	(interactive "P")
 	(gateway--assert-mode)
 	(gateway--position-point t)
 	(gateway-beginning-of-verse actual-start))
@@ -449,7 +449,8 @@ described in `gateway-beginning-of-verse'."
 	(gateway--assert-mode)
 	(if (plist-get gateway-data :prev)
 			(gateway-fetch-passage (plist-get gateway-data :prev) (plist-get gateway-data :version) (current-buffer))
-		(user-error "No more chapters")))
+		(user-error "No more chapters"))
+	(point-min))
 
 (defun gateway-right-chapter ()
 	"Move one chapter to the right."
@@ -457,7 +458,8 @@ described in `gateway-beginning-of-verse'."
 	(gateway--assert-mode)
 	(if (plist-get gateway-data :next)
 			(gateway-fetch-passage (plist-get gateway-data :next) (plist-get gateway-data :version) (current-buffer))
-		(user-error "No more chapters")))
+		(user-error "No more chapters"))
+	(point-min))
 
 (provide 'gateway-mode)
 
