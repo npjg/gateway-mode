@@ -66,7 +66,7 @@ To modify with available versions, use `gateway-set-version'.")
 	"Raise an error if the proper data structures are not present,
 and return t otherwise."
 	(if (boundp 'gateway-data) t
-		(user-error "Not a BibleGateway buffer")))
+		(error "Not a BibleGateway buffer")))
 
 (defun gateway--update-message (entity status)
 	"Display a message when a visibility ENTITY is set to STATUS."
