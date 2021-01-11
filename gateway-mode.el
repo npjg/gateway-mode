@@ -246,13 +246,13 @@ overriides the global `gateway-reuse-same-buffer' setting."
 							(gateway--assert-mode)
 							(rename-buffer passage-name t)
 							(set (make-local-variable 'gateway-data) struct)
-							(gateway-refresh-passage))
+							(gateway-refresh-passage t))
 					(with-output-to-temp-buffer passage-name
 						(setq inhibit-read-only t)
 						(pop-to-buffer passage-name)
 						(gateway-display-mode)
 						(set (make-local-variable 'gateway-data) struct)
-						(gateway-refresh-passage)))))))
+						(gateway-refresh-passage t)))))))
 
 (define-derived-mode gateway-display-mode help-mode "Gateway"
 	"Major mode for displaying Gateway passages."
@@ -298,13 +298,14 @@ overriides the global `gateway-reuse-same-buffer' setting."
 	(gateway--update-message "Verse numbers" gateway-inhibit-versenums)
 	(gateway-refresh-passage))
 
-(defun gateway-refresh-passage ()
+(defun gateway-refresh-passage (&optional new)
 	"Refresh the currently-displayed passage, applying the changes
-to entity visibility settings."
+to entity visibility settings. When NEW is non-nil, the
+function does not apply resilient position matching and instead
+jumps to the beginning of the buffer."
 	(interactive)
 	(gateway--assert-mode)
-
-	(let ((pos (point)))
+	(let ((resilient (unless new (ignore-errors (gateway-get-resilient-position)))))
 		(erase-buffer)
 		(let ((text (plist-get gateway-data :text))
 					(last-verse nil)
@@ -323,42 +324,58 @@ to entity visibility settings."
 			(dolist (node advices nil)
 				(advice-remove (intern (format "shr-tag-%s" node))
 											 (intern (format "gateway--shr-tag-%s" node)))))
-		(plist-put gateway-data :end (1- (point)))
+		(plist-put gateway-data :end (- (point) 2))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
-		(goto-char pos))
+		(if resilient
+				(gateway-restore-resilient-position resilient)
+			(goto-char (point-min))
+			(gateway-beginning-of-verse)
+			(unless new (message "Could not restore point after refresh"))))
 	(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation))))
 
-(defun gateway-find-verse (verse)
+(defun gateway-get-resilient-position ()
+	"Return a cons cell containing the current verse in the `car'
+	and the plain character index in the `cdr'. Plain character
+	index does not include any superscripts like verse numbers,
+	footnotes, or cross-references."
+	(let* ((start (point))
+				 (verse (gateway-get-verse-at-point))
+				 (plain-chars 0))
+		(save-excursion
+			(gateway-beginning-of-verse)
+			(while (<= (point) start)
+				(unless (get-text-property (point) 'class)
+					(setq plain-chars (1+ plain-chars)))
+				(right-char)))
+		(cons verse plain-chars)))
+
+(defun gateway-restore-resilient-position (spec)
+	"Use the SPEC from `gateway-get-resilient-position' to
+restore the point."
+	(gateway-find-verse (car spec))
+	(let ((plain-chars (cdr spec)))
+		(while (> plain-chars 0)
+			(unless (get-text-property (point) 'class)
+				(setq plain-chars (1- plain-chars)))
+			(right-char)))
+	(left-char)
+	)
+
+(defun gateway-find-verse (verse &optional actual-start)
 	"Find the verse with ID VERSE, and jump to its beginning as
-given by `gateway-beginning-of-verse'."
+given by `gateway-beginning-of-verse', using ACTUAL-START as it
+is described in `gateway-beginning-of-verse'."
 	(let ((pos (point)))
 		(goto-char (point-min))
 		(while (not (string= (get-text-property (point) 'verse) verse))
 			(when (or (>= (point) (plist-get gateway-data :end))
-								(not (ignore-errors (gateway-right-verse))))
+								(not (ignore-errors (gateway-right-verse t))))
 				(goto-char pos)
 				(user-error (format "Verse ID \"%s\" not found in current selection" verse))))
-		(gateway-beginning-of-verse)))
+		(gateway-beginning-of-verse actual-start)))
 
-(defun gateway--get-resilient-position ()
-	"Return a position in terms of spaces within the current verse,
-which withstands changing the visibility of Scripture elements."
-	(let* ((end (point))
-				 (start (progn (gateway-beginning-of-verse) (point)))
-				 (verse (gateway--verse-point))
-				 (segment (buffer-substring start end)))
-		(list verse)))
-
-(defun gateway--restore-resilient-position (verse)
-	"Restore a resilient position from `gateway--get-resilient-position'."
-	(gateway-find-verse verse)
-	;; (let ((end (get-text-property (point) 'verse)))
-		;; (search-forward key)
-		;; (when (>= (point) end) (user-error "Could not restore point"))))
-	)
-
-(defun gateway-get-verse-at-point (&optional format move-to-beginning)
+(defun gateway-get-verse-at-point (&optional format)
 	"Return the reference of the current verse in human-readable
 form when FORMAT is non-nil.
 
@@ -366,7 +383,7 @@ When FORMAT is :biblehub, format the verse in accord with
 BibleHub's URL scheme."
 	(gateway--assert-mode)
 	(save-excursion
-		(unless move-to-beginning (gateway-beginning-of-verse))
+		(gateway-beginning-of-verse t t)
 		(let ((loc (get-text-property (point) 'verse)))
 			(unless loc (user-error "No verse defined at point"))
 			(if format
@@ -392,7 +409,7 @@ the end of the current verse if FORWARD is non-nil."
 			(if forward (right-char) (left-char))
 			(when (> (point) (plist-get gateway-data :end)) (user-error "No more verses")))))
 
-(defun gateway-beginning-of-verse (&optional actual-start)
+(defun gateway-beginning-of-verse (&optional actual-start no-message)
 	"Move to the beginning of the current verse text. When
 ACTUAL-START is non-nil, the point is set to the real start of
 the verse, including verse numbers, footnotes, cross-references,
@@ -406,7 +423,7 @@ the verse."
 		(while (and (<= (point) (plist-get gateway-data :end))
 								(get-text-property (point) 'class))
 			(goto-char (next-single-char-property-change (point) 'class))))
-	(message (gateway-get-verse-at-point t t)))
+	(unless no-message (message (gateway-get-verse-at-point t))))
 
 (defun gateway-end-of-verse ()
 	"Move to the end of the current verse."
@@ -415,7 +432,7 @@ the verse."
 	(unless (get-text-property (1+ (point)) 'verse)
 		(gateway--position-point t)
 		(left-char))
-	(messsage (gateway-get-verse-at-point nil t)))
+	(message (gateway-get-verse-at-point nil)))
 
 (defun gateway-mark-verse (&optional actual-start)
 	"Mark the current verse, using ACTUAL-START as it is described
@@ -450,8 +467,7 @@ described in `gateway-beginning-of-verse'."
 	(gateway--assert-mode)
 	(if (plist-get gateway-data :prev)
 			(gateway-fetch-passage (plist-get gateway-data :prev) (plist-get gateway-data :version) (current-buffer))
-		(user-error "No more chapters"))
-	(point-min))
+		(user-error "No more chapters")))
 
 (defun gateway-right-chapter ()
 	"Move one chapter to the right."
@@ -459,8 +475,7 @@ described in `gateway-beginning-of-verse'."
 	(gateway--assert-mode)
 	(if (plist-get gateway-data :next)
 			(gateway-fetch-passage (plist-get gateway-data :next) (plist-get gateway-data :version) (current-buffer))
-		(user-error "No more chapters"))
-	(point-min))
+		(user-error "No more chapters")))
 
 (provide 'gateway-mode)
 
