@@ -97,7 +97,9 @@ version's abbreviation and full name."
 				 (init (point))
 				 (classes (split-string (cdr (assoc 'class (cadr dom))))))
 		(apply func r)
-		(when (and (not (string= (cadr classes) last-verse)) (string= (car classes) "text"))
+		(when (= (length classes) 1)
+			(put-text-property init (point) 'class (car classes)))
+		(when (not (string= (cadr classes) last-verse))
 			(put-text-property init (1+ init) 'verse (cadr classes))
 			(setq last-verse (cadr classes)))))
 
