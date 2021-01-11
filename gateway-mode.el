@@ -44,6 +44,19 @@ To modify with available versions, use `gateway-set-version'.")
 	BibleGateway buffer. A new buffer is created if it does not
 	exist.")
 
+(defconst gateway-default-keys
+	'(("C" gateway-toggle-crossrefs)
+		("F" gateway-toggle-footnotes)
+		("H" gateway-toggle-headings)
+		("V" gateway-toggle-versenums)
+		("P" gateway-show-verse-at-point)
+		("J" gateway-left-chapter)
+		("j" gateway-left-verse)
+		("K" gateway-right-chapter)
+		("k" gateway-right-verse)
+		("g" gateway-refresh-passage))
+		"The default keymap for `gateway-display-mode'.")
+
 (defun gateway--check-libxml ()
 	"Assert that libxml2 is compiled into Emacs."
 	(unless (fboundp 'libxml-parse-html-region)
@@ -241,13 +254,10 @@ overriides the global `gateway-reuse-same-buffer' setting."
 
 (define-derived-mode gateway-display-mode help-mode "Gateway"
 	"Major mode for displaying Gateway passages."
-	(setq gateway-display-mode-map (make-sparse-keymap))
+	(setq gateway-display-mode-map (make-sparse-keymap "Gateway"))
   (set-keymap-parent gateway-display-mode-map help-mode-map)
-	(define-key gateway-display-mode-map "C" #'gateway-toggle-crossrefs)
-	(define-key gateway-display-mode-map "F" #'gateway-toggle-footnotes)
-	(define-key gateway-display-mode-map "H" #'gateway-toggle-headings)
-	(define-key gateway-display-mode-map "V" #'gateway-toggle-versenums)
-	(define-key gateway-display-mode-map "P" #'gateway-show-verse-at-point)
+	(dolist (key gateway-default-keys)
+		(apply #'define-key gateway-display-mode-map key))
 	(use-local-map gateway-display-mode-map)
 	(run-hooks 'gateway-display-mode-hook)
 	;; :group gateway
@@ -395,7 +405,7 @@ the verse."
 		(while (and (<= (point) (plist-get gateway-data :end))
 								(get-text-property (point) 'class))
 			(goto-char (next-single-char-property-change (point) 'class))))
-	(message (gateway-get-verse-at-point nil t)))
+	(message (gateway-get-verse-at-point t t)))
 
 (defun gateway-end-of-verse ()
 	"Move to the end of the current verse."
