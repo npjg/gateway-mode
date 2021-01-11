@@ -36,6 +36,9 @@ To modify with available versions, use `gateway-set-version'.")
 (defvar gateway-inhibit-versenums nil
 	"If non-nil, inhibit BibleGateway verse numbers.")
 
+(defvar gateway-woj-color nil
+	"If non-nil, specify the foreground color for WoJ.")
+
 (defvar gateway-display-mode-hook nil
   "Normal hook run when entering gateway-display-mode.")
 
@@ -110,6 +113,9 @@ numbers and poetry indentation. Only intended to advise
 				(progn (funcall #'shr-fontize-dom (car r) 'bold)
 							 (put-text-property init (point) 'class (car classes)))
 			(apply func r))
+		;; TODO: Use a full face.
+		(if (and (string= (car classes) "woj") gateway-woj-color)
+				(shr-colorize-region init (point) gateway-woj-color))
 		(when (and (= (length classes) 2) (not (string= (cadr classes) last-verse)))
 			(put-text-property init (1+ init) 'verse (cadr classes))
 			(setq last-verse (cadr classes)))))
