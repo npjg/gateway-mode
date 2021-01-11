@@ -305,7 +305,8 @@ to entity visibility settings."
 	(let ((pos (point)))
 		(erase-buffer)
 		(let ((text (plist-get gateway-data :text))
-					(last-verse nil))
+					(last-verse nil)
+					(advices '("sup" "span" "a" "h3")))
 			;; Set visibilities
 			(gateway--refresh-entities (dom-by-class text (regexp-opt '("crossreference" "crossrefs"))) gateway-inhibit-crossrefs)
 			(gateway--refresh-entities (dom-by-class text "footnote") gateway-inhibit-footnotes)
@@ -313,15 +314,13 @@ to entity visibility settings."
 			(gateway--refresh-entities (dom-by-class text (regexp-opt '("chapternum" "versenum"))) gateway-inhibit-versenums)
 
 			;; Add advices
-			(advice-add #'shr-tag-sup :around #'gateway--shr-tag-sup)
-			(advice-add #'shr-tag-span :around #'gateway--shr-tag-span)
-			(advice-add #'shr-tag-a :around #'gateway--shr-tag-a)
-			(advice-add #'shr-tag-h3 :around #'gateway--shr-tag-h3)
+			(dolist (node advices nil)
+				(advice-add (intern (format "shr-tag-%s" node)) :around
+										(intern (format "gateway--shr-tag-%s" node))))
 			(shr-insert-document text)
-			(advice-remove #'shr-tag-sup #'gateway--shr-tag-sup)
-			(advice-remove #'shr-tag-span #'gateway--shr-tag-span)
-			(advice-remove #'shr-tag-a #'gateway--shr-tag-a)
-			(advice-remove #'shr-tag-h3 #'gateway--shr-tag-h3))
+			(dolist (node advices nil)
+				(advice-remove (intern (format "shr-tag-%s" node))
+											 (intern (format "gateway--shr-tag-%s" node)))))
 		(plist-put gateway-data :end (1- (point)))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
