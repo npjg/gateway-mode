@@ -39,6 +39,11 @@ To modify with available versions, use `gateway-set-version'.")
 (defvar gateway-display-mode-hook nil
   "Normal hook run when entering gateway-display-mode.")
 
+(defvar gateway-reuse-same-buffer t
+	"If non-nil, perform passage lookups in an existing
+	BibleGateway buffer. A new buffer is created if it does not
+	exist.")
+
 (defun gateway--check-libxml ()
 	"Assert that libxml2 is compiled into Emacs."
 	(unless (fboundp 'libxml-parse-html-region)
@@ -196,13 +201,15 @@ non-nil, causes the version to be read for the current lookup
 only. Otherwise, VERSION holds a result from
 `gateway-fetch-version' for the current lookup only. UPDATE holds
 the name of an existing BibleGateway buffer to be updated, which
-will be verified valid before writing."
+will be verified valid before writing. Providing UPDATE
+overriides the global `gateway-reuse-same-buffer' setting."
 	(interactive "MReference: \nP")
 	(gateway--check-libxml)
 	(unless version (gateway-get-version))
-	;; TOOD: Let them choose when to jump to new buffer.
-	(when (ignore-errors (gateway--assert-mode))
-		(setq update (current-buffer)))
+	(when (and gateway-reuse-same-buffer (not update))
+		(setq update (catch 'found (dolist (buffer (buffer-list) nil)
+				(when (ignore-errors (gateway--assert-mode))
+					(throw 'found buffer))))))
 	(let* ((data (if (and (called-interactively-p) version)
 							(gateway-fetch-version)
 						(or version gateway-version)))
