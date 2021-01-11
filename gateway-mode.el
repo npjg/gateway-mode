@@ -327,10 +327,9 @@ jumps to the beginning of the buffer."
 		(plist-put gateway-data :end (- (point) 2))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
-		(if resilient
-				(gateway-restore-resilient-position resilient)
+		(if resilient (gateway-restore-resilient-position resilient)
 			(goto-char (point-min))
-			(gateway-beginning-of-verse)
+			(gateway-beginning-of-verse nil t)
 			(unless new (message "Could not restore point after refresh"))))
 	(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation))))
 
@@ -343,7 +342,7 @@ jumps to the beginning of the buffer."
 				 (verse (gateway-get-verse-at-point))
 				 (plain-chars 0))
 		(save-excursion
-			(gateway-beginning-of-verse)
+			(gateway-beginning-of-verse nil t)
 			(while (<= (point) start)
 				(unless (get-text-property (point) 'class)
 					(setq plain-chars (1+ plain-chars)))
@@ -359,8 +358,9 @@ restore the point."
 			(unless (get-text-property (point) 'class)
 				(setq plain-chars (1- plain-chars)))
 			(right-char)))
-	(left-char)
-	)
+	(if (<= (point) (save-excursion (gateway-beginning-of-verse nil t) (point)))
+			(gateway-beginning-of-verse nil t)
+		(left-char)))
 
 (defun gateway-find-verse (verse &optional actual-start)
 	"Find the verse with ID VERSE, and jump to its beginning as
@@ -370,10 +370,10 @@ is described in `gateway-beginning-of-verse'."
 		(goto-char (point-min))
 		(while (not (string= (get-text-property (point) 'verse) verse))
 			(when (or (>= (point) (plist-get gateway-data :end))
-								(not (ignore-errors (gateway-right-verse t))))
+								(not (ignore-errors (gateway-right-verse t t))))
 				(goto-char pos)
 				(user-error (format "Verse ID \"%s\" not found in current selection" verse))))
-		(gateway-beginning-of-verse actual-start)))
+		(gateway-beginning-of-verse actual-start t)))
 
 (defun gateway-get-verse-at-point (&optional format)
 	"Return the reference of the current verse in human-readable
@@ -423,7 +423,7 @@ the verse."
 		(while (and (<= (point) (plist-get gateway-data :end))
 								(get-text-property (point) 'class))
 			(goto-char (next-single-char-property-change (point) 'class))))
-	(unless no-message (message (gateway-get-verse-at-point t))))
+	(unless no-message (message (gateway-get-verse-at-point t))) t)
 
 (defun gateway-end-of-verse ()
 	"Move to the end of the current verse."
@@ -444,22 +444,22 @@ in `gateway-beginning-of-verse'."
 	(gateway-end-of-verse)
 	(activate-mark))
 
-(defun gateway-left-verse (&optional actual-start)
+(defun gateway-left-verse (&optional actual-start no-message)
 	"Move one verse to the left. using ACTUAL-START as it is described
 in `gateway-beginning-of-verse'."
 	(interactive "P")
 	(gateway--assert-mode)
-	(gateway-beginning-of-verse t)
+	(gateway-beginning-of-verse t t)
 	(left-char)
-	(gateway-beginning-of-verse actual-start))
+	(gateway-beginning-of-verse actual-start no-message))
 
-(defun gateway-right-verse (&optional actual-start)
+(defun gateway-right-verse (&optional actual-start no-message)
 	"Move one verse to the right. using ACTUAL-START as it is
 described in `gateway-beginning-of-verse'."
 	(interactive "P")
 	(gateway--assert-mode)
 	(gateway--position-point t)
-	(gateway-beginning-of-verse actual-start))
+	(gateway-beginning-of-verse actual-start no-message))
 
 (defun gateway-left-chapter ()
 	"Move one chapter to the left."
