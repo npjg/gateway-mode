@@ -90,16 +90,27 @@ version's abbreviation and full name."
 	"Refresh the NODES' display property with INHIBIT."
 	(dolist (node nodes) (dom-set-attribute node 'style (format "display:%s" (if inhibit "none" "inline")))))
 
+(defun gateway--verse-id-p (id)
+	"Returns non-nil if ID is a valid verse ID (osis), nil otherwise."
+	(let ((comps (split-string id "-")))
+		(and (= (length comps) 3)
+				 (> (string-to-number (cadr comps)) 0)
+				 (> (string-to-number (caddr comps)) 0))))
+
 (defun gateway--shr-tag-span (func &rest r)
-	"Set the verse property for each span. Only intended to advise
+	"Set the verse property for each span, and also mark chapter
+numbers and poetry indentation. Only intended to advise
 `shr-tag-span'."
 	(let* ((dom (car r))
 				 (init (point))
 				 (classes (split-string (cdr (assoc 'class (cadr dom))))))
-		(apply func r)
-		(when (= (length classes) 1)
-			(put-text-property init (point) 'class (car classes)))
-		(when (not (string= (cadr classes) last-verse))
+		;; We are not loading CSS, so fontize the chapter number and WoJ
+		;; automatically.
+		(if (string= (car classes) "chapternum")
+				(progn (funcall #'shr-fontize-dom (car r) 'bold)
+							 (put-text-property init (point) 'class (car classes)))
+			(apply func r))
+		(when (and (= (length classes) 2) (not (string= (cadr classes) last-verse)))
 			(put-text-property init (1+ init) 'verse (cadr classes))
 			(setq last-verse (cadr classes)))))
 
