@@ -110,7 +110,7 @@ numbers and poetry indentation. Only intended to advise
 		;; We are not loading CSS, so fontize the chapter number and WoJ
 		;; automatically.
 		(if (string= (car classes) "chapternum")
-				(progn (funcall #'shr-fontize-dom (car r) 'bold)
+				(progn (funcall #'shr-fontize-dom dom 'bold)
 							 (put-text-property init (point) 'class (car classes)))
 			(apply func r))
 		;; TODO: Use a full face.
@@ -136,6 +136,14 @@ numbers and poetry indentation. Only intended to advise
 				 (init (point)))
 		(apply func r)
 		(put-text-property init (point) 'class 'heading)))
+
+(defun gateway--shr-tag-h4 (func &rest r)
+	"Set the heading class for each h4. Only intended to advise
+`shr-tag-h3'."
+	(let* ((dom (car r))
+				 (init (point)))
+		(apply func r)
+		(shr-add-font init (point) 'bold-italic)))
 
 (defun gateway--shr-tag-a (func &rest r)
 	"Set the footnote tooltip text to the actual value of the
@@ -326,7 +334,7 @@ jumps to the beginning of the buffer."
 		(erase-buffer)
 		(let ((text (plist-get gateway-data :text))
 					(last-verse nil)
-					(advices '("sup" "span" "a" "h3")))
+					(advices '("sup" "span" "a" "h3" "h4")))
 			;; Set visibilities
 			(gateway--refresh-entities (dom-by-class text (regexp-opt '("crossreference" "crossrefs"))) gateway-inhibit-crossrefs)
 			(gateway--refresh-entities (dom-by-class text "footnote") gateway-inhibit-footnotes)
