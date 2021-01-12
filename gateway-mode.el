@@ -477,7 +477,9 @@ in `gateway-beginning-of-verse'."
 	(interactive "P")
 	(gateway--assert-mode)
 	(gateway-beginning-of-verse t t)
-	(left-char)
+	(if (= (point) (point-min))
+			(message "Beginning of buffer")
+		(left-char))
 	(gateway-beginning-of-verse actual-start no-message))
 
 (defun gateway-right-verse (&optional actual-start no-message)
@@ -485,7 +487,9 @@ in `gateway-beginning-of-verse'."
 described in `gateway-beginning-of-verse'."
 	(interactive "P")
 	(gateway--assert-mode)
-	(gateway--position-point t)
+	(ignore-errors (gateway--position-point t))
+	(when (>= (point) (plist-get gateway-data :end))
+		(left-char))
 	(gateway-beginning-of-verse actual-start no-message))
 
 (defun gateway-left-chapter ()
