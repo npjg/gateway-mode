@@ -476,10 +476,11 @@ in `gateway-beginning-of-verse'."
 in `gateway-beginning-of-verse'."
 	(interactive "P")
 	(gateway--assert-mode)
+	(let ((past (>= (point) (plist-get gateway-data :end))))
+	(when past (goto-char (plist-get gateway-data :end)))
 	(gateway-beginning-of-verse t t)
-	(if (= (point) (point-min))
-			(message "Beginning of buffer")
-		(left-char))
+	(unless (or past (= (point) (point-min)))
+		(left-char)))
 	(gateway-beginning-of-verse actual-start no-message))
 
 (defun gateway-right-verse (&optional actual-start no-message)
@@ -489,7 +490,7 @@ described in `gateway-beginning-of-verse'."
 	(gateway--assert-mode)
 	(ignore-errors (gateway--position-point t))
 	(when (>= (point) (plist-get gateway-data :end))
-		(left-char))
+				(goto-char (plist-get gateway-data :end)))
 	(gateway-beginning-of-verse actual-start no-message))
 
 (defun gateway-left-chapter ()
