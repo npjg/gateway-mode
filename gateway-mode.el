@@ -47,6 +47,10 @@ When nil, give WoJ the foreground colour specified in `gateway-woj-color'")
 (defvar gateway-display-mode-hook nil
   "Normal hook run when entering gateway-display-mode.")
 
+(defvar gateway-max-passage-message-chars 2000
+	"If non-nil, specifies the maximum number of verse characters to
+display in a minibuffer message.")
+
 (defvar gateway-reuse-same-buffer t
 	"If non-nil, perform passage lookups in an existing
 	BibleGateway buffer. A new buffer is created if it does not
@@ -83,6 +87,11 @@ and return t otherwise."
 (defun gateway--update-message (entity status)
 	"Display a message when a visibility ENTITY is set to STATUS."
 	(message (format "%s %sabled in current buffer" entity (if status "dis" "en"))))
+
+(defun gateway--format-reference ()
+	"Format a reference for the current BibleGateway buffer."
+	(gateway--assert-mode)
+	(format "%s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation)))
 
 (defun gateway--version-completing-read ()
 	"Get the static version information from BibleGateway, and
@@ -286,17 +295,33 @@ overriides the global `gateway-reuse-same-buffer' setting."
 				(dolist (class '("full-chap-link" "passage-other-trans"))
 					(dom-remove-node dom (car (dom-by-class dom class))))
 				(unless bcv (user-error (format "Could not find passage \"%s\" in version %s" passage version)))
-				(if update (with-current-buffer update
-							(gateway--assert-mode)
-							(rename-buffer passage-name t)
-							(set (make-local-variable 'gateway-data) struct)
-							(gateway-refresh-passage t))
-					(with-output-to-temp-buffer passage-name
-						(setq inhibit-read-only t)
-						(pop-to-buffer passage-name)
-						(gateway-display-mode)
-						(set (make-local-variable 'gateway-data) struct)
-						(gateway-refresh-passage t)))))))
+				(cond ((bufferp update) (with-current-buffer update
+								 (gateway--assert-mode)
+								 (rename-buffer passage-name t)
+								 (set (make-local-variable 'gateway-data) struct)
+								 (gateway-refresh-passage t)))
+							((eq update 'string) (with-temp-buffer
+								 (setq inhibit-read-only t)
+								 (gateway-display-mode)
+								 (set (make-local-variable 'gateway-data) struct)
+								 (gateway-refresh-passage t)
+								 (let ((result (concat (buffer-substring (point-min) (plist-get gateway-data :end))
+																			 "\n\n -- " (gateway--format-reference))))
+									 (kill-buffer)
+									 result)))
+							(t (with-output-to-temp-buffer passage-name
+									 (setq inhibit-read-only t)
+									 (pop-to-buffer passage-name)
+									 (gateway-display-mode)
+									 (set (make-local-variable 'gateway-data) struct)
+									 (gateway-refresh-passage t))))))))
+
+(defun gateway-fetch-passage-to-minibuffer (passage &optional version)
+	(interactive "MReference: \nP")
+	(let ((passage (gateway-fetch-passage passage version 'string)))
+		(if (or (not gateway-max-passage-message-chars) (< (length passage) gateway-max-passage-message-chars))
+				(message passage)
+			(user-error "Cannot display passage in minibuffer; maximum character limit reached"))))
 
 (define-derived-mode gateway-display-mode help-mode "Gateway"
 	"Major mode for displaying Gateway passages."
@@ -360,8 +385,7 @@ jumps to the beginning of the buffer."
 			(goto-char (point-min))
 			(gateway-beginning-of-verse nil t)
 			(unless new (message "Could not restore point after refresh"))))
-	(when gateway-show-headerline
-		(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation)))))
+	(when gateway-show-headerline (setq header-line-format (concat " " (gateway--format-reference)))))
 
 (defun gateway-get-resilient-position ()
 	"Return a cons cell containing the current verse in the `car'
