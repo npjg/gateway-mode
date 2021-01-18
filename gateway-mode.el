@@ -36,7 +36,12 @@ To modify with available versions, use `gateway-set-version'.")
 (defvar gateway-inhibit-versenums nil
 	"If non-nil, inhibit BibleGateway verse numbers.")
 
-(defvar gateway-woj-color nil
+(defvar gateway-inhibit-woJ nil
+	"If non-nil, inhibit BibleGateway WoJ display.
+
+When nil, give WoJ the foreground colour specified in `gateway-woj-color'")
+
+(defvar gateway-woJ-color nil
 	"If non-nil, specify the foreground color for WoJ.")
 
 (defvar gateway-display-mode-hook nil
@@ -300,38 +305,23 @@ overriides the global `gateway-reuse-same-buffer' setting."
 	;; :group gateway
 	)
 
-(defun gateway-toggle-crossrefs ()
-	"Toggle the display of footnotes in the current BibleGateway buffer."
-	(interactive)
-	(gateway--assert-mode)
-	(setq-local gateway-inhibit-crossrefs (not gateway-inhibit-crossrefs))
-	(gateway--update-message "Cross-references"  gateway-inhibit-crossrefs)
-	(message (format "Cross-references %sabled in current buffer" (if gateway-inhibit-crossrefs "dis" "en")))
-	(gateway-refresh-passage))
+(defmacro define-gateway-toggle (entity)
+	"Declare a toggler for various features of the BibleGateway display."
+	`(defun ,(intern (format "gateway-toggle-%s" entity)) (&optional arg)
+		 (format "Toggle the display of %s in the current BibleGateway buffer." ,entity)
+		 (interactive)
+		 (gateway--assert-mode)
+		 (setq-local ,(intern (format "gateway-inhibit-%s" entity))
+								 (if arg (> arg 0) (not ,(intern (format "gateway-inhibit-%s" entity)))))
+		 (gateway--update-message ,(concat (capitalize (substring entity 0 1)) (substring entity 1))
+															,(intern (format "gateway-inhibit-%s" entity)))
+		 (gateway-refresh-passage)))
 
-(defun gateway-toggle-footnotes ()
-	"Toggle the display of footnotes in the current BibleGateway buffer."
-	(interactive)
-	(gateway--assert-mode)
-	(setq-local gateway-inhibit-footnotes (not gateway-inhibit-footnotes))
-	(gateway--update-message "Footnotes" gateway-inhibit-footnotes)
-	(gateway-refresh-passage))
-
-(defun gateway-toggle-headings ()
-	"Toggle the display of headings in the current BibleGateway buffer."
-	(interactive)
-	(gateway--assert-mode)
-	(setq-local gateway-inhibit-headings (not gateway-inhibit-headings))
-	(gateway--update-message "Headings" gateway-inhibit-headings)
-	(gateway-refresh-passage))
-
-(defun gateway-toggle-versenums ()
-	"Toggle the display of verse numbers in the current BibleGateway buffer."
-	(interactive)
-	(gateway--assert-mode)
-	(setq-local gateway-inhibit-versenums (not gateway-inhibit-versenums))
-	(gateway--update-message "Verse numbers" gateway-inhibit-versenums)
-	(gateway-refresh-passage))
+(define-gateway-toggle "crossrefs")
+(define-gateway-toggle "headings")
+(define-gateway-toggle "footnotes")
+(define-gateway-toggle "versenums")
+(define-gateway-toggle "woJ")
 
 (defun gateway-refresh-passage (&optional new)
 	"Refresh the currently-displayed passage, applying the changes
