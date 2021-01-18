@@ -106,6 +106,7 @@ numbers and poetry indentation. Only intended to advise
 `shr-tag-span'."
 	(let* ((dom (car r))
 				 (init (point))
+				 (id (cdr (assoc 'id (cadr dom))))
 				 (classes (split-string (cdr (assoc 'class (cadr dom))))))
 		;; We are not loading CSS, so fontize the chapter number and WoJ
 		;; automatically.
@@ -118,6 +119,7 @@ numbers and poetry indentation. Only intended to advise
 				(shr-colorize-region init (point) gateway-woj-color))
 		(when (and (= (length classes) 2) (not (string= (cadr classes) last-verse)))
 			(put-text-property init (1+ init) 'verse (cadr classes))
+			(put-text-property init (1+ init) 'id id)
 			(setq last-verse (cadr classes)))))
 
 (defun gateway--shr-tag-sup (func &rest r)
@@ -152,10 +154,16 @@ footnote. Only intended to advise `shr-tag-a'."
 				 (init (point))
 				 (id (cdr (assoc 'href (cadr dom)))))
 		(apply func r)
-		(when (string-match "^#[fc]..-" id)
-			(let* ((text (plist-get gateway-data :text))
-						 (rendered (with-temp-buffer (shr-descend (dom-by-id text (substring id 1))) (buffer-substring (point-min) (point-max)))))
-				(put-text-property init (point) 'help-echo rendered)))))
+		(cond ((string-match "^#[fc]..-" id)
+					 (let* ((text (plist-get gateway-data :text))
+									(rendered (with-temp-buffer (shr-descend (dom-by-id text (substring id 1))) (buffer-substring (point-min) (point-max)))))
+						 (put-text-property init (point) 'help-echo rendered)
+						 (put-text-property init (point) 'keymap nil)
+						 (put-text-property init (point) 'follow-link nil)))
+					((string-match "^#..-" id))
+					((string-match "^/" id)
+					 (let* ((relative (get-text-property (1- (point)) 'shr-url)))
+						 (when relative (put-text-property init (1- (point)) 'shr-url (format "https://biblegateway.com%s" relative))))))))
 
 (defun gateway--resolve-osis (osis)
 	"Convert standard book abbrevation OSIS to human-friendly form."
