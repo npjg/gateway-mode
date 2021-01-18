@@ -52,6 +52,10 @@ When nil, give WoJ the foreground colour specified in `gateway-woj-color'")
 	BibleGateway buffer. A new buffer is created if it does not
 	exist.")
 
+(defvar gateway-show-headerline t
+	"If non-nil, set the frozen header line to the current passage
+	and version. When nil, use no header line.")
+
 (defconst gateway-default-keys
 	'(("C" gateway-toggle-crossrefs)
 		("F" gateway-toggle-footnotes)
@@ -356,7 +360,8 @@ jumps to the beginning of the buffer."
 			(goto-char (point-min))
 			(gateway-beginning-of-verse nil t)
 			(unless new (message "Could not restore point after refresh"))))
-	(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation))))
+	(when gateway-show-headerline
+		(setq header-line-format (format " %s (%s)" (plist-get gateway-data :bcv) (plist-get gateway-data :translation)))))
 
 (defun gateway-get-resilient-position ()
 	"Return a cons cell containing the current verse in the `car'
