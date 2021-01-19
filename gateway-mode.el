@@ -133,8 +133,8 @@ numbers and poetry indentation. Only intended to advise
 							 (put-text-property init (point) 'class (car classes)))
 			(apply func r))
 		;; TODO: Use a full face.
-		(if (and (string= (car classes) "woj") gateway-woj-color)
-				(shr-colorize-region init (point) gateway-woj-color))
+		(if (and (string= (car classes) "woj") gateway-woJ-color)
+				(shr-colorize-region init (point) gateway-woJ-color))
 		(when (and (= (length classes) 2) (not (string= (cadr classes) last-verse)))
 			(put-text-property init (1+ init) 'verse (cadr classes))
 			(put-text-property init (1+ init) 'id id)
