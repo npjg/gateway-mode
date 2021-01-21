@@ -191,6 +191,24 @@ footnote. Only intended to advise `shr-tag-a'."
 					(plist-get gateway-data :books))
 		nil))
 
+(defun gateway--set-first-verse-id ()
+	"In a quirk of the returned HTML, the first verse span returned
+from a query does not have a verse ID attached to it. The ID is
+contained only in the header. If there is more than 1 verse
+loaded, this function subtracts 1 from the second verse's ID to
+obtain the proper ID for the first verse."
+	(gateway--assert-mode)
+	(save-excursion
+		(goto-char (point-min))
+		(when (ignore-errors (gateway-end-of-verse))
+			(gateway-right-verse t t)
+			(let* ((nextid (split-string (get-text-property (point) 'id) "-"))
+						 (thisid (format "%s-%s-%d" (car nextid) (cadr nextid)
+														 (1- (string-to-number (caddr nextid))))))
+				(gateway-left-verse t t)
+				(put-text-property (point) (1+ (point)) 'id thisid))))
+	nil)
+
 (defun gateway-get-version ()
 	"Get the global `gateway-get-version', and set it if it is not
 fully set."
@@ -381,6 +399,7 @@ jumps to the beginning of the buffer."
 		(plist-put gateway-data :end (- (point) 2))
 		(shr-insert-document '(html nil (body nil (hr nil))))
 		(shr-insert-document (plist-get gateway-data :copyright))
+		(gateway--set-first-verse-id)
 		(if resilient (gateway-restore-resilient-position resilient)
 			(goto-char (point-min))
 			(gateway-beginning-of-verse nil t)
@@ -420,9 +439,10 @@ restore the point."
 	"Find the verse with ID VERSE, and jump to its beginning as
 given by `gateway-beginning-of-verse', using ACTUAL-START as it
 is described in `gateway-beginning-of-verse'."
-	(let ((pos (point)))
+	(let ((pos (point))
+				(compare (if (string-match "[a-z]*-[A-Z]*-[0-9]*" verse) 'id 'verse)))
 		(goto-char (point-min))
-		(while (not (string= (get-text-property (point) 'verse) verse))
+		(while (not (string= (get-text-property (point) compare) verse))
 			(when (or (>= (point) (plist-get gateway-data :end))
 								(not (ignore-errors (gateway-right-verse t t))))
 				(goto-char pos)
