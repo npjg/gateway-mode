@@ -51,10 +51,11 @@ When nil, give WoJ the foreground colour specified in `gateway-woj-color'")
 	"If non-nil, specifies the maximum number of verse characters to
 display in a minibuffer message.")
 
-(defvar gateway-reuse-same-buffer t
+(defvar gateway-reuse-same-buffer-action #'display-buffer-reuse-window
 	"If non-nil, perform passage lookups in an existing
-	BibleGateway buffer. A new buffer is created if it does not
-	exist.")
+	BibleGateway buffer, passing the specified function as the
+	action to `display-buffer'. A new buffer is created if it does
+	not exist.")
 
 (defvar gateway-show-headerline t
 	"If non-nil, set the frozen header line to the current passage
@@ -290,7 +291,7 @@ overriides the global `gateway-reuse-same-buffer' setting."
 	(interactive "MReference: \nP")
 	(gateway--check-libxml)
 	(unless version (gateway-get-version))
-	(when (and gateway-reuse-same-buffer (not update))
+	(when (and gateway-reuse-same-buffer-action (not update))
 		(setq update (catch 'found (dolist (buffer (buffer-list) nil)
 				(when (with-current-buffer buffer (ignore-errors (gateway--assert-mode)))
 					(throw 'found buffer))))))
@@ -318,7 +319,7 @@ overriides the global `gateway-reuse-same-buffer' setting."
 								 (rename-buffer passage-name t)
 								 (set (make-local-variable 'gateway-data) struct)
 								 (gateway-refresh-passage t)
-								 (switch-to-buffer update)))
+								 (display-buffer update gateway-reuse-same-buffer-action)))
 							((eq update 'string) (with-temp-buffer
 								 (setq inhibit-read-only t)
 								 (gateway-display-mode)
