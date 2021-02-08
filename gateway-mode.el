@@ -292,7 +292,7 @@ overriides the global `gateway-reuse-same-buffer' setting."
 	(unless version (gateway-get-version))
 	(when (and gateway-reuse-same-buffer (not update))
 		(setq update (catch 'found (dolist (buffer (buffer-list) nil)
-				(when (ignore-errors (gateway--assert-mode))
+				(when (with-current-buffer buffer (ignore-errors (gateway--assert-mode)))
 					(throw 'found buffer))))))
 	(let* ((data (if (and (called-interactively-p) version)
 							(gateway-fetch-version)
@@ -317,7 +317,8 @@ overriides the global `gateway-reuse-same-buffer' setting."
 								 (gateway--assert-mode)
 								 (rename-buffer passage-name t)
 								 (set (make-local-variable 'gateway-data) struct)
-								 (gateway-refresh-passage t)))
+								 (gateway-refresh-passage t)
+								 (switch-to-buffer update)))
 							((eq update 'string) (with-temp-buffer
 								 (setq inhibit-read-only t)
 								 (gateway-display-mode)
