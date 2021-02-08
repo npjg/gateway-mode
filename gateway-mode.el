@@ -500,14 +500,15 @@ the verse."
 			(goto-char (next-single-char-property-change (point) 'class))))
 	(unless no-message (message (gateway-get-verse-at-point t))) t)
 
-(defun gateway-end-of-verse ()
+(defun gateway-end-of-verse (&optional no-message)
 	"Move to the end of the current verse."
 	(interactive)
 	(gateway--assert-mode)
 	(unless (get-text-property (1+ (point)) 'verse)
 		(gateway--position-point t)
 		(left-char))
-	(message (gateway-get-verse-at-point nil)))
+	(unless no-message
+		(message (gateway-get-verse-at-point nil))))
 
 (defun gateway-mark-verse (&optional actual-start)
 	"Mark the current verse, using ACTUAL-START as it is described
